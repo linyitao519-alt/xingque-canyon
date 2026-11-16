@@ -335,7 +335,7 @@ export class Renderer {
   private tileSig = '';
   private frameNo = 0;
   /** 性能统计（帧率显示和测试用）：本帧烘了几块地面瓦片、缓存里有几块、上传的动态纹理像素数 */
-  perf = { baked: 0, tiles: 0, uploadPx: 0, bakedTotal: 0 };
+  perf = { baked: 0, tiles: 0, uploadPx: 0, bakedTotal: 0, sprites: 0, spriteBakes: 0 };
 
   /** three.js 路径。
    *  · 地面（地表、河道、道路、底图）是静态的：按 256 设备像素一块烘成瓦片，贴在世界里随镜头移动，只在第一次进入视野时画一次、上传一次。
@@ -403,10 +403,15 @@ export class Renderer {
 
   /** 把一个静态贴图函数（岩石、树、塔、基地……）画到小画布上并裁到实际轮廓，之后每帧只是一张贴图片 */
   private bake(key: string, st: SpriteState, ppu: number): { cv: HTMLCanvasElement; x: number; y: number; w: number; h: number } | null {
-    if (Math.abs(ppu - this.bakedPpu) > 0.01) { for (const b of this.baked.values()) if (b) this.three?.drop(b.cv); this.baked.clear(); this.bakedPpu = ppu; }
-    const id = `${key}|${st.team}|${st.seed}|${st.r ?? ''}|${st.h ?? ''}|${st.variant ?? ''}|${st.dead ? 1 : 0}|${st.locked ? 1 : 0}|${st.face}`;
+    // 缓存只在镜头缩放或像素比变了才清空。单位、建筑、地物各有各的贴图倍率，倍率记在键里——
+    // 之前按"本次倍率与上次不同"清缓存，三种倍率交替出现，等于每帧把所有地物重烘一遍
+    const base = this.cam.z * this.dpr;
+    if (Math.abs(base - this.bakedPpu) > 0.001) { for (const b of this.baked.values()) if (b) this.three?.drop(b.cv); this.baked.clear(); this.bakedPpu = base; }
+    this.perf.sprites = this.baked.size;
+    const id = `${ppu}|${key}|${st.team}|${st.seed}|${st.r ?? ''}|${st.h ?? ''}|${st.variant ?? ''}|${st.dead ? 1 : 0}|${st.locked ? 1 : 0}|${st.face}`;
     let b = this.baked.get(id);
     if (b !== undefined) return b;
+    this.perf.spriteBakes++;
     const L = 90, R = 90, U = 150, D = 50, W = Math.ceil((L + R) * ppu), H = Math.ceil((U + D) * ppu);     // 世界单位的画幅，足够放下基地
     const big = document.createElement('canvas'); big.width = W; big.height = H;
     const c = big.getContext('2d', { willReadFrequently: true })!;
