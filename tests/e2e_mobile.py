@@ -86,26 +86,21 @@ with sync_playwright() as p:
     check('松开技能键施放弦月并进入冷却', st2['cast']['skill'] == 0 and st2['cast']['ok'] and st2['cd'] > 3, st2)
     check('瞄准与施放期间英雄一直在移动', st2['x'] > x_before + 20 and x_before > p0['x'] + 10 and st2['joy'] >= 0, [p0['x'], x_before, st2['x']])
 
-    # ---------- 3. 定星 ×2 + 三星结界（仍然一边走） ----------
+    # ---------- 3. 定星 + 星河阵（仍然一边走） ----------
     touch.down(2, sk[1]['x'], sk[1]['y']); touch.move(2, sk[1]['x'], sk[1]['y'] - 70); wait(120); touch.up(2)
     wait(200)
-    m1 = ev("__xq.game.marks.length")
-    ev("__xq.game.player.cds[1] = 0")              # 仅为缩短等待：跳过定星 3 秒冷却
-    touch.down(2, sk[1]['x'], sk[1]['y']); touch.move(2, sk[1]['x'] + 70, sk[1]['y']); wait(120); touch.up(2)
-    wait(200)
-    m2 = ev("__xq.game.marks.length")
-    check('定星两次落点后保留两枚星标', m1 == 1 and m2 == 2, [m1, m2])
+    st_b = ev("({cast: __xq.hud.lastCast, cd: __xq.game.player.cds[1]})")
+    check('定星落点施放并进入冷却', st_b['cast']['skill'] == 1 and st_b['cast']['ok'] and st_b['cd'] > 3, st_b)
     touch.down(2, sk[2]['x'], sk[2]['y']); touch.move(2, sk[2]['x'] - 60, sk[2]['y'] + 50); wait(150)
     aim_ok = ev("__xq.hud.aimWorld(__xq.hud.aim).ok")
-    page.screenshot(path=f'{OUT}/e2e-constellation-aim.png')
+    page.screenshot(path=f'{OUT}/e2e-starfield-aim.png')
     touch.up(2); wait(200)
-    st3 = ev("({cast: __xq.hud.lastCast, cd: __xq.game.player.cds[2], marks: __xq.game.marks.length})")
-    check('三星结界以两枚星标 + 落点成阵并消耗星标', aim_ok and st3['cast']['skill'] == 2 and st3['cast']['ok'] and st3['cd'] > 20 and st3['marks'] == 0, st3)
-    # 缺标记时取消且不进冷却
-    ev("__xq.game.player.cds[2] = 0")
+    st3 = ev("({cast: __xq.hud.lastCast, cd: __xq.game.player.cds[2], zones: __xq.game.zones.length})")
+    check('星河阵在落点展开并进入冷却', aim_ok and st3['cast']['skill'] == 2 and st3['cast']['ok'] and st3['cd'] > 20 and st3['zones'] == 1, st3)
+    # 冷却中再按：取消且提示
     touch.down(2, sk[2]['x'], sk[2]['y']); touch.move(2, sk[2]['x'] - 60, sk[2]['y'] + 50); wait(100); touch.up(2); wait(150)
-    st4 = ev("({cast: __xq.hud.lastCast, cd: __xq.game.player.cds[2]})")
-    check('缺星标时三星结界取消、不进冷却', (st4['cast'] or {}).get('reason') == 'marks' and st4['cd'] == 0, st4)
+    st4 = ev("({cast: __xq.hud.lastCast, zones: __xq.game.zones.length})")
+    check('冷却中再放星河阵：不生效', (st4['cast'] or {}).get('reason') == 'cooldown' and st4['zones'] == 1, st4)
 
     # ---------- 4. 拖到取消区放弃 ----------
     ev("__xq.game.player.cds[0] = 0; __xq.hud.lastCast = null")

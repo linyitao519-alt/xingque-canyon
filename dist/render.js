@@ -313,7 +313,8 @@ export class Renderer {
     /** 技能特效与弹体贴图（assets/fx）。没加载到的继续用代码画的占位 */
     fx = {};
     loadFx(base = 'assets/fx/') {
-        for (const n of ['crescent', 'beacon', 'beacon-burst', 'triangle-edge', 'triangle-vertex', 'hero-bolt', 'tower-bolt-blue', 'tower-bolt-red']) {
+        for (const n of ['crescent', 'beacon', 'beacon-burst', 'triangle-edge', 'triangle-vertex', 'hero-bolt', 'tower-bolt-blue', 'tower-bolt-red',
+            'fx-hedeng-lantern', 'fx-feixian-pierce', 'fx-chiyan-thrust', 'fx-xuanyuan-bash', 'fx-yelan-claws', 'fx-chiyan-sweep', 'fx-hedeng-glow', 'fx-feixian-volley', 'fx-xuanyuan-bulwark']) {
             const i = new Image();
             i.onload = () => { this.fx[n] = i; };
             i.src = base + n + '.png';
@@ -899,7 +900,18 @@ export class Renderer {
         const rgb = (hex) => { const n = parseInt(hex.slice(1), 16); return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`; };
         for (const e of g.events) {
             const age = T - e.t;
-            if (e.type === 'cone' && age < 0.28) {
+            if (e.type === 'cone' && age < 0.32 && e.fx && this.fx[e.fx]) {
+                // 专属扇形挥击：贴图开口朝右、锚点在左侧中点，绕锚点转到出手方向，由小到大扫出去并淡出
+                const k = age / 0.32, s = e.r * 1.18 * (0.7 + 0.3 * Math.min(1, k * 2.2));
+                c.save();
+                c.translate(e.x, e.y);
+                c.rotate(Math.atan2(e.dy, e.dx));
+                c.globalAlpha = k < 0.5 ? 1 : 1 - (k - 0.5) / 0.5;
+                c.drawImage(this.fx[e.fx], 0, -s / 2, s, s);
+                c.restore();
+                c.globalAlpha = 1;
+            }
+            else if (e.type === 'cone' && age < 0.28) {
                 const k = age / 0.28, a0 = Math.atan2(e.dy, e.dx), half = e.angle / 2;
                 c.beginPath();
                 c.moveTo(e.x, e.y);
@@ -936,6 +948,67 @@ export class Renderer {
                 c.beginPath();
                 c.arc(e.x, e.y, e.r * (0.3 + 0.7 * k), 0, 7);
                 c.fill();
+            }
+        }
+        // 星河阵：持续的星域（旋转的星盘纹 + 每次结算时向外扩的一圈）
+        for (const z of g.zones) {
+            const life = (T - z.born) / (z.until - z.born), fade = Math.min(1, (T - z.born) / 0.2) * Math.min(1, (z.until - T) / 0.25 + 0.15), ph = ((T - z.born) % z.tick) / z.tick;
+            c.fillStyle = `rgba(150,110,255,${0.2 * fade})`;
+            c.beginPath();
+            c.arc(z.x, z.y, z.r, 0, 7);
+            c.fill();
+            if (this.fx.beacon) {
+                c.save();
+                c.translate(z.x, z.y);
+                c.rotate(T * 0.9);
+                c.globalAlpha = 0.85 * fade;
+                c.drawImage(this.fx.beacon, -z.r, -z.r, z.r * 2, z.r * 2);
+                c.restore();
+                c.globalAlpha = 1;
+            }
+            c.strokeStyle = `rgba(215,190,255,${0.95 * fade})`;
+            c.lineWidth = 2;
+            c.beginPath();
+            c.arc(z.x, z.y, z.r, 0, 7);
+            c.stroke();
+            c.strokeStyle = `rgba(255,240,200,${0.8 * (1 - ph) * fade})`;
+            c.lineWidth = 2.5 * (1 - ph) + 0.5;
+            c.beginPath();
+            c.arc(z.x, z.y, z.r * (0.25 + 0.75 * ph), 0, 7);
+            c.stroke();
+            // 剩余时间：外圈弧
+            c.strokeStyle = `rgba(255,233,168,${0.9 * fade})`;
+            c.lineWidth = 1.4;
+            c.beginPath();
+            c.arc(z.x, z.y, z.r + 3, -Math.PI / 2, -Math.PI / 2 + (1 - life) * Math.PI * 2);
+            c.stroke();
+        }
+        // 月痕：被弦月命中的敌人脚下一弯月牙，定星命中时引爆
+        for (const u of [...g.heroes, ...g.minions]) {
+            if (!(u.moonUntil > T) || !this.see(u))
+                continue;
+            const a = T * 2.2;
+            c.strokeStyle = 'rgba(255,233,168,.95)';
+            c.lineWidth = 2.2;
+            c.lineCap = 'round';
+            c.beginPath();
+            c.arc(u.x, u.y, u.r + 5, a, a + 2.2);
+            c.stroke();
+            c.strokeStyle = 'rgba(200,170,255,.8)';
+            c.lineWidth = 1.2;
+            c.beginPath();
+            c.arc(u.x, u.y, u.r + 5, a + Math.PI, a + Math.PI + 1.2);
+            c.stroke();
+        }
+        for (const e of g.events) {
+            const age = T - e.t;
+            if (e.type === 'detonate' && age < 0.3) {
+                const k = age / 0.3;
+                c.strokeStyle = `rgba(255,240,190,${1 - k})`;
+                c.lineWidth = 3 * (1 - k) + 1;
+                c.beginPath();
+                c.arc(e.x, e.y, 8 + 22 * k, 0, 7);
+                c.stroke();
             }
         }
         for (const h of g.heroes) {
@@ -1105,7 +1178,7 @@ export class Renderer {
         for (const e of g.events) {
             const age = T - e.t;
             if (e.type === 'beacon' && age < 0.45) {
-                const k = age / 0.45, burst = this.fx['beacon-burst'];
+                const k = age / 0.45, burst = (e.fx && this.fx[e.fx]) || this.fx['beacon-burst'];
                 if (burst) {
                     const fw = burst.naturalWidth / 4, sz = e.r * 2.5;
                     c.drawImage(burst, Math.min(3, Math.floor(k * 4)) * fw, 0, fw, burst.naturalHeight, e.x - sz / 2, e.y - sz / 2, sz, sz);
@@ -1241,7 +1314,7 @@ export class Renderer {
                 c.arc(p.x, p.y, range, 0, 7);
                 c.fill();
                 c.stroke();
-                if (kind === 'ground-circle') {
+                if (kind === 'ground-circle' || kind === 'zone') {
                     c.fillStyle = `rgba(${col},.3)`;
                     c.beginPath();
                     c.arc(w.x, w.y, sk.radius, 0, 7);
@@ -1395,6 +1468,17 @@ export class Renderer {
                     // 英雄放技能也播出手动作
                     const atk = u.kind === 'hero' ? Math.min(T - u.atkT, T - u.castT) : T - u.atkT;
                     this.sprite(key, u.x, u.y, { team: u.team, face, moving: run, atk, seed: u.id, phase: smooth ? a.phase : undefined }, u.brush >= 0 ? 0.62 : 1, Camera.UNIT_SCALE);
+                    if (u.kind === 'hero' && u.shield > 0 && u.shieldFx && this.fx[u.shieldFx]) { // 护盾罩：罩在英雄身上，快到期时淡出
+                        const img = this.fx[u.shieldFx], [dx0, dy0] = this.cam.toScreen(u.x, u.y), sz = 40 * Camera.UNIT_SCALE * this.cam.z * 1.25, al = Math.min(0.9, Math.max(0, (u.shieldUntil - T) / 0.5));
+                        if (this.three)
+                            this.three.quad(img, dx0 - sz / 2, dy0 - sz * 0.86, sz, sz, 0, 1, al);
+                        else {
+                            const c2 = this.ctx, ga = c2.globalAlpha;
+                            c2.globalAlpha = al;
+                            c2.drawImage(img, dx0 - sz / 2, dy0 - sz * 0.86, sz, sz);
+                            c2.globalAlpha = ga;
+                        }
+                    }
                     if (T - u.hitT < 0.09) {
                         const c = this.ctx, [sx, sy] = this.cam.toScreen(u.x, u.y, u.kind === 'hero' ? 15 : 8), r = (u.kind === 'hero' ? 12 : 7) * this.cam.z;
                         c.fillStyle = 'rgba(255,255,255,.2)';
@@ -1423,6 +1507,15 @@ export class Renderer {
             c.save();
             c.translate(x, y);
             c.rotate(ang);
+            const bimg = cr.fx && this.fx[cr.fx];
+            if (bimg) {
+                const BL = Math.max(46, cr.width * 2.6) * z;
+                if (Math.cos(ang) < 0)
+                    c.scale(1, -1);
+                c.drawImage(bimg, -BL * 0.62, -BL / 4, BL, BL / 2);
+                c.restore();
+                continue;
+            } // 专属直线弹：朝右的贴图沿飞行方向旋转
             const gr = c.createLinearGradient(-L, 0, L * 0.3, 0);
             gr.addColorStop(0, 'rgba(255,255,255,0)');
             gr.addColorStop(0.7, col);

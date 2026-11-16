@@ -76,34 +76,40 @@
         "id": "crescent",
         "name": "弦月",
         "kind": "line",
-        "range": 155,
-        "width": 24,
+        "range": 165,
+        "width": 26,
         "damage": 70,
-        "cooldownSeconds": 4
+        "returns": true,
+        "returnDamageFraction": 0.6,
+        "markSeconds": 4,
+        "cooldownSeconds": 4.5
       },
       {
         "id": "beacon",
         "name": "定星",
         "kind": "ground-circle",
         "castRange": 140,
-        "radius": 40,
-        "damage": 45,
-        "slowFraction": 0.3,
-        "slowSeconds": 1.3,
-        "markLifetimeSeconds": 7,
-        "maxActiveMarks": 2,
-        "cooldownSeconds": 3
+        "radius": 42,
+        "damage": 55,
+        "slowFraction": 0.35,
+        "slowSeconds": 1.5,
+        "markBonusDamage": 45,
+        "markRootSeconds": 0.8,
+        "cooldownSeconds": 5
       },
       {
-        "id": "constellation",
-        "name": "三星结界",
-        "kind": "triangle",
-        "castRange": 140,
-        "requiresActiveMarks": 2,
-        "minimumTriangleArea": 180,
-        "damage": 115,
-        "rootSeconds": 0.85,
-        "cooldownSeconds": 22
+        "id": "starfield",
+        "name": "星河阵",
+        "kind": "zone",
+        "castRange": 150,
+        "radius": 66,
+        "seconds": 3,
+        "tickSeconds": 0.5,
+        "tickDamage": 28,
+        "slowFraction": 0.4,
+        "finalDamage": 70,
+        "finalRootSeconds": 0.7,
+        "cooldownSeconds": 24
       }
     ]
   },
@@ -133,7 +139,7 @@
       "name": "星璃",
       "role": "法师 · 远程",
       "color": "#b48cff",
-      "blurb": "弦月穿透，定星留标，三星结界定身"
+      "blurb": "弦月去而复返并留下月痕，定星引爆月痕定身，星河阵持续轰炸"
     },
     "xuanyuan": {
       "name": "玄垣",

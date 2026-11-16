@@ -163,15 +163,24 @@ export class Hud {
     if (mag >= 0.18) { x = p.x + a.ax * range; y = p.y + a.ay * range; }
     else if (tgt) { const d = Math.hypot(tgt.x - p.x, tgt.y - p.y), k = Math.min(1, range / (d || 1)); x = p.x + (tgt.x - p.x) * k; y = p.y + (tgt.y - p.y) * k; }
     else { x = p.x + p.faceX * range * 0.6; y = p.y + p.faceY * range * 0.6; }
-    const chk = kind === 'triangle' ? g.constellationCheck(x, y) : { ok: true as boolean, reason: undefined as string | undefined };
+    const chk = { ok: true as boolean, reason: undefined as string | undefined };
     return { x, y, dx: 0, dy: 0, ok: chk.ok, reason: chk.reason };
   }
 
   private release(a: Aim): void {
     const g = this.game, w = this.aimWorld(a);
-    const res = g.player.sprite !== 'xingli' ? g.castSkill(a.i, w) : a.i === 0 ? g.castCrescent(w.dx, w.dy) : a.i === 1 ? g.castBeacon(w.x, w.y) : g.castConstellation(w.x, w.y);
+    const res = g.castSkill(a.i, w);
     this.lastCast = { skill: a.i, ok: res.ok, reason: res.reason };
     if (!res.ok && res.reason && REASON[res.reason]) this.toast = { text: REASON[res.reason], until: performance.now() + 1100 };
+  }
+
+  /** 技能专属图标（assets/icons/icon-<英雄>-<技能>.png）：用到时才加载，加载失败就退回矢量图形 */
+  private iconCache: Record<string, HTMLImageElement> = {};
+  private skillIcon(hero: string, id?: string): HTMLImageElement | null {
+    if (!id) return null;
+    const k = `${hero}-${id}`; let im = this.iconCache[k];
+    if (!im) { im = this.iconCache[k] = new Image(); im.src = `assets/icons/icon-${k}.png`; }
+    return im;
   }
 
   /** 没有专属图标的技能：按技能类型画一个矢量图形（直线 / 落点 / 扇形 / 突进 / 增益），用英雄的代表色 */
@@ -250,18 +259,17 @@ export class Hud {
     // 技能键
     const S = g.skillsOf(p) as any[], sb = this.skillBtns, isX = p.sprite === 'xingli', hcol = g.heroDef(p.sprite)?.color ?? '#ffe9a8';
     for (let i = 0; i < 3; i++) {
-      const b = sb[i], cd = p.cds[i], active = this.aim?.i === i, lack = isX && i === 2 && g.marks.length < 2;
+      const b = sb[i], cd = p.cds[i], active = this.aim?.i === i, lack = false;
       c.save(); c.beginPath(); c.arc(b.x, b.y, b.r, 0, 7); c.clip();
       c.fillStyle = '#0f2a30'; c.fillRect(b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
-      const img = isX ? this.icons[i] : null;
-      if (!isX && S[i]) { c.globalAlpha = cd > 0 || !p.alive ? 0.45 : 1; this.glyph(c, S[i].kind, b, hcol); c.globalAlpha = 1; }
+      const img = isX ? this.icons[i] : this.skillIcon(p.sprite, S[i]?.id);
+      if (!isX && S[i] && !(img && img.complete && img.naturalWidth)) { c.globalAlpha = cd > 0 || !p.alive ? 0.45 : 1; this.glyph(c, S[i].kind, b, hcol); c.globalAlpha = 1; }
       if (img && img.complete && img.naturalWidth) { c.globalAlpha = lack || cd > 0 || !p.alive ? 0.45 : 1; c.drawImage(img, b.x - b.r * 1.04, b.y - b.r * 1.04, b.r * 2.08, b.r * 2.08); c.globalAlpha = 1; }
       if (cd > 0) { c.fillStyle = 'rgba(6,16,20,.66)'; c.beginPath(); c.moveTo(b.x, b.y); c.arc(b.x, b.y, b.r * 1.2, -Math.PI / 2, -Math.PI / 2 + (cd / S[i].cooldownSeconds) * Math.PI * 2); c.closePath(); c.fill(); }
       c.restore();
       c.strokeStyle = active ? '#fff' : cd > 0 ? 'rgba(160,190,185,.6)' : 'rgba(255,233,168,.95)'; c.lineWidth = active ? 4 : 2.5;
       c.beginPath(); c.arc(b.x, b.y, b.r, 0, 7); c.stroke();
       if (cd > 0) { c.fillStyle = '#fff'; c.font = `700 ${Math.round(b.r * 0.8)}px ${FONT}`; c.fillText(cd < 1 ? cd.toFixed(1) : String(Math.ceil(cd)), b.x, b.y + 1); }
-      if (isX && i === 2) for (let k = 0; k < 2; k++) { c.fillStyle = k < g.marks.length ? '#ffe9a8' : 'rgba(10,26,30,.85)'; c.strokeStyle = '#ffe9a8'; c.lineWidth = 1.5; c.beginPath(); c.arc(b.x + (k - 0.5) * b.r * 0.6, b.y - b.r * 1.22, b.r * 0.17, 0, 7); c.fill(); c.stroke(); }
     }
     // 取消区
     if (this.aim) {

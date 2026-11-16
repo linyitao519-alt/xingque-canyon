@@ -17,9 +17,9 @@ with sync_playwright() as p:
     b = p.chromium.launch(); ctx = b.new_context(viewport={'width': 844, 'height': 390}, device_scale_factor=1, has_touch=True, is_mobile=True)
     pg = ctx.new_page(); errs = []; pg.on('pageerror', lambda e: errs.append(str(e))); pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' else None)
     pg.goto(URL + '?paused=1'); pg.wait_for_function('window.__xq && __xq.renderer.sceneReady'); t = Touch(ctx.new_cdp_session(pg))
-    pg.evaluate('__xq.animReady'); pg.wait_for_function("Object.keys(__xq.renderer.fx).length === 8", timeout=10000)
+    pg.evaluate('__xq.animReady'); pg.wait_for_function("Object.keys(__xq.renderer.fx).length === 17", timeout=10000)
     check('动画帧带已加载：六名英雄 + 四种小兵', sorted(pg.evaluate('__xq.anim.loaded')) == ['chiyan', 'feixian', 'hedeng', 'melee-blue', 'melee-red', 'ranged-blue', 'ranged-red', 'xingli', 'xuanyuan', 'yelan'])
-    check('8 张特效/弹体贴图已加载', sorted(pg.evaluate('Object.keys(__xq.renderer.fx)')) == ['beacon', 'beacon-burst', 'crescent', 'hero-bolt', 'tower-bolt-blue', 'tower-bolt-red', 'triangle-edge', 'triangle-vertex'])
+    check('17 张特效/弹体贴图已加载（原有 8 张 + 五名新英雄的 9 张）', sorted(pg.evaluate('Object.keys(__xq.renderer.fx)')) == sorted(['beacon', 'beacon-burst', 'crescent', 'hero-bolt', 'tower-bolt-blue', 'tower-bolt-red', 'triangle-edge', 'triangle-vertex', 'fx-hedeng-lantern', 'fx-feixian-pierce', 'fx-chiyan-thrust', 'fx-xuanyuan-bash', 'fx-yelan-claws', 'fx-chiyan-sweep', 'fx-hedeng-glow', 'fx-feixian-volley', 'fx-xuanyuan-bulwark']))
     check('触控前音频尚未解锁（浏览器策略）', pg.evaluate('__xq.sfx.ctx === null'))
     ST = "(() => { const a = __xq.anim.last[__xq.game.player.id]; return a ? a.state : null; })()"
     sk = pg.evaluate('__xq.hud.skillBtns'); mute = pg.evaluate('__xq.hud.muteBtn')
@@ -35,12 +35,14 @@ with sync_playwright() as p:
     atk = pg.evaluate(ST); s1 = pg.evaluate('__xq.sfx.stats["attack-cast"] || 0'); n = pg.evaluate('__xq.game.crescents.length')
     check('弦月：播出手帧、响出手音效、弦月贴图在飞', atk == 'attack' and s1 == s0 + 1 and n == 1, [atk, s0, s1, n])
     pg.evaluate(ADV, 20); pg.wait_for_timeout(120); check('出手动作播完后回到待机', pg.evaluate(ST) == 'idle')
-    # 定星 ×2 + 三星结界 → 各自的音效
+    # 定星 ×2 + 星河阵 → 各自的音效（星河阵：展开 1 次，3 秒后收束 1 次）
     for dx, dy in ((60, -30), (10, -70)):
         pg.evaluate('__xq.game.player.cds[1] = 0'); t.down(2, sk[1]['x'], sk[1]['y']); t.move(2, sk[1]['x'] + dx, sk[1]['y'] + dy); pg.evaluate(ADV, 2); t.up(2); pg.evaluate(ADV, 3)
+    b0 = pg.evaluate('__xq.sfx.stats["beacon-placed"]')
     t.down(2, sk[2]['x'], sk[2]['y']); t.move(2, sk[2]['x'] + 75, sk[2]['y'] - 75); pg.evaluate(ADV, 2); t.up(2); pg.evaluate(ADV, 3)
+    z = pg.evaluate('__xq.game.zones.length'); pg.evaluate(ADV, 100)
     st = pg.evaluate('__xq.sfx.stats')
-    check('定星两次、三星结界一次：星标音效 2 次、结界闭合音效 1 次', st.get('beacon-placed') == 2 and st.get('constellation-close') == 1, st)
+    check('定星两次、星河阵一次：定星音效 2 次；星河阵展开时 1 次、收束时结界音效 1 次', b0 == 2 and z == 1 and st.get('beacon-placed') >= 3 and st.get('constellation-close') == 1 and pg.evaluate('__xq.game.zones.length') == 0, [b0, z, st])
     # 静音键
     t.down(1, mute['x'], mute['y']); t.up(1); m1 = pg.evaluate('[__xq.hud.muted, __xq.sfx.muted]')
     t.down(1, mute['x'], mute['y']); t.up(1); m2 = pg.evaluate('[__xq.hud.muted, __xq.sfx.muted]')

@@ -1,6 +1,6 @@
 // 对局模拟层：不依赖 DOM，可在 Node 里无画面运行（见 tests/）。
 // 数值全部来自 assets/data/map.json 与 match-rules.json。
-import { NavGrid, Polyline, inTriangle, triArea } from './nav.js';
+import { NavGrid, Polyline } from './nav.js';
 export const LANES = ['north', 'mid', 'south'];
 export const TEAMS = ['blue', 'red'];
 export const enemyOf = (t) => (t === 'blue' ? 'red' : 'blue');
@@ -26,6 +26,7 @@ export class Game {
     projectiles = [];
     crescents = [];
     marks = [];
+    zones = [];
     events = [];
     kills = { blue: 0, red: 0 };
     player;
@@ -68,6 +69,7 @@ export class Game {
         this.projectiles = [];
         this.crescents = [];
         this.marks = [];
+        this.zones = [];
         this.events = [];
         this.pending = [];
         this.kills = { blue: 0, red: 0 };
@@ -76,7 +78,7 @@ export class Game {
         this.waves = 0;
         const base = (team, x, y, r, hp) => ({
             id: this.nextId++, team, x, y, r, hp, maxHp: hp, alive: true, brush: -1, revealUntil: 0,
-            slowUntil: 0, slowFrac: 0, rootUntil: 0, hitT: -9, faceX: team === 'blue' ? 1 : -1, faceY: 0,
+            slowUntil: 0, slowFrac: 0, rootUntil: 0, moonUntil: 0, hitT: -9, faceX: team === 'blue' ? 1 : -1, faceY: 0,
         });
         this.cores = {};
         this.towersBy = { blue: {}, red: {} };
@@ -246,6 +248,7 @@ export class Game {
                 this.updateTower(t, dt);
         this.updateProjectiles(dt);
         this.updateCrescents(dt);
+        this.updateZones();
         this.marks = this.marks.filter((m) => m.expire > this.time);
         this.separate();
         if (this.minions.some((m) => !m.alive))
@@ -281,7 +284,7 @@ export class Game {
             const st = w[p.kind], [x, y] = this.lanePath[p.team][p.lane].at(2);
             this.minions.push({
                 id: this.nextId++, team: p.team, x, y, r: MINION_R, hp: st.hp, maxHp: st.hp, alive: true, brush: -1, revealUntil: 0,
-                slowUntil: 0, slowFrac: 0, rootUntil: 0, hitT: -9, faceX: p.team === 'blue' ? 1 : -1, faceY: 0,
+                slowUntil: 0, slowFrac: 0, rootUntil: 0, moonUntil: 0, hitT: -9, faceX: p.team === 'blue' ? 1 : -1, faceY: 0,
                 kind: 'minion', mkind: p.kind, lane: p.lane, speed: st.moveSpeed, range: st.attackRange, dmg: st.attackDamage,
                 interval: st.attackInterval, atkCd: 0, atkT: -9, progress: 2, target: null, moving: false,
             });
@@ -607,127 +610,42 @@ export class Game {
         if (h.isPlayer && t.kind !== 'tower' && t.kind !== 'core')
             this.autoSkills(h, t);
     }
-    /** 代打时的技能使用（仅 autopilot）。 */
+    /** 代打时的技能使用（仅 autopilot）：按技能类型在够得着时对当前目标出手。 */
     autoSkills(h, t) {
-        const [cres, bea, con] = this.rules.xingli.skills;
-        const d = dist(h, t) || 1, ux = (t.x - h.x) / d, uy = (t.y - h.y) / d;
-        if (h.cds[0] <= 0 && d < cres.range - 8)
-            this.castCrescent(ux, uy);
-        if (h.cds[1] <= 0 && d < bea.castRange - 26) {
-            const s = this.marks.length % 2 ? 1 : -1;
-            this.castBeacon(t.x - uy * 24 * s, t.y + ux * 24 * s);
-        }
-        if (h.cds[2] <= 0 && this.marks.length === 2) {
-            const mx = (this.marks[0].x + this.marks[1].x) / 2, my = (this.marks[0].y + this.marks[1].y) / 2;
-            const ex = t.x - mx, ey = t.y - my, L = Math.hypot(ex, ey) || 1;
-            let px = t.x + (ex / L) * 34, py = t.y + (ey / L) * 34;
-            const pd = Math.hypot(px - h.x, py - h.y);
-            if (pd > con.castRange) {
-                px = h.x + ((px - h.x) / pd) * con.castRange;
-                py = h.y + ((py - h.y) / pd) * con.castRange;
+        const d = dist(h, t) || 1, ux = (t.x - h.x) / d, uy = (t.y - h.y) / d, aim = { x: t.x, y: t.y, dx: ux, dy: uy };
+        this.skillsOf(h).forEach((s, i) => {
+            if (h.cds[i] > 0)
+                return;
+            if (s.kind === 'line' || s.kind === 'cone') {
+                if (d < s.range - 6)
+                    this.castSkill(i, aim, h);
             }
-            const a = [this.marks[0].x, this.marks[0].y], b = [this.marks[1].x, this.marks[1].y];
-            if (inTriangle([t.x, t.y], a, b, [px, py]))
-                this.castConstellation(px, py);
-        }
-    }
-    // ---------------------------------------------------------------- 星璃技能
-    canCast(i) {
-        if (this.over)
-            return { ok: false, reason: 'over' };
-        if (!this.player.alive)
-            return { ok: false, reason: 'dead' };
-        if (this.player.cds[i] > 0)
-            return { ok: false, reason: 'cooldown' };
-        return { ok: true };
-    }
-    /** 弦月：沿方向飞行的窄月牙，穿透并对路径上每个敌方单位结算一次。 */
-    castCrescent(dx, dy) {
-        const c = this.canCast(0);
-        if (!c.ok)
-            return c;
-        const h = this.player, s = this.rules.xingli.skills[0];
-        let L = Math.hypot(dx, dy);
-        if (L < 1e-6) {
-            dx = h.faceX;
-            dy = h.faceY;
-            L = Math.hypot(dx, dy) || 1;
-        }
-        dx /= L;
-        dy /= L;
-        this.crescents.push({ x: h.x, y: h.y, dx, dy, left: s.range, hit: new Set(), src: h, width: s.width, damage: s.damage, style: 'crescent' });
-        h.cds[0] = s.cooldownSeconds;
-        h.castT = this.time;
-        h.faceX = dx;
-        h.faceY = dy;
-        this.reveal(h);
-        this.events.push({ type: 'cast', t: this.time, x: h.x, y: h.y, skill: 0 });
-        return { ok: true };
-    }
-    /** 定星：落点范围伤害+减速，并留下星标（最多保留最近两枚）。 */
-    castBeacon(x, y) {
-        const c = this.canCast(1);
-        if (!c.ok)
-            return c;
-        const h = this.player, s = this.rules.xingli.skills[1];
-        if (Math.hypot(x - h.x, y - h.y) > s.castRange + 0.5)
-            return { ok: false, reason: 'range' };
-        for (const u of this.enemiesOf(h.team))
-            if (Math.hypot(u.x - x, u.y - y) <= s.radius + u.r * 0.5) {
-                u.slowUntil = this.time + s.slowSeconds;
-                u.slowFrac = s.slowFraction;
-                u.revealUntil = this.time + 1.5;
-                this.damage(h, u, s.damage);
+            else if (s.kind === 'dash') {
+                if (d < s.range - 6 && d > 36 && t.kind === 'hero')
+                    this.castSkill(i, aim, h);
             }
-        this.marks.push({ x, y, expire: this.time + s.markLifetimeSeconds, born: this.time });
-        while (this.marks.length > s.maxActiveMarks)
-            this.marks.shift();
-        h.cds[1] = s.cooldownSeconds;
-        h.castT = this.time;
-        this.reveal(h);
-        this.events.push({ type: 'beacon', t: this.time, x, y, r: s.radius });
-        return { ok: true };
-    }
-    /** 三星结界能否以该落点成立（给瞄准提示用）。 */
-    constellationCheck(x, y) {
-        const h = this.player, s = this.rules.xingli.skills[2];
-        if (this.marks.length < s.requiresActiveMarks)
-            return { ok: false, reason: 'marks' };
-        if (Math.hypot(x - h.x, y - h.y) > s.castRange + 0.5)
-            return { ok: false, reason: 'range' };
-        if (triArea([this.marks[0].x, this.marks[0].y], [this.marks[1].x, this.marks[1].y], [x, y]) < s.minimumTriangleArea)
-            return { ok: false, reason: 'area' };
-        return { ok: true };
-    }
-    /** 三星结界：两枚星标 + 落点围成三角，命中其中敌人并定身，随后消耗两枚星标。条件不满足时取消且不进冷却。 */
-    castConstellation(x, y) {
-        const c = this.canCast(2);
-        if (!c.ok)
-            return c;
-        const v = this.constellationCheck(x, y);
-        if (!v.ok)
-            return v;
-        const h = this.player, s = this.rules.xingli.skills[2];
-        const a = [this.marks[0].x, this.marks[0].y], b = [this.marks[1].x, this.marks[1].y], p = [x, y];
-        let hits = 0;
-        for (const u of this.enemiesOf(h.team))
-            if (inTriangle([u.x, u.y], a, b, p)) {
-                u.rootUntil = this.time + s.rootSeconds;
-                u.revealUntil = this.time + 1.5;
-                hits++;
-                this.damage(h, u, s.damage);
+            else if (s.kind === 'ground-circle') {
+                if (d < s.castRange - 8)
+                    this.castSkill(i, aim, h);
             }
-        this.marks = [];
-        h.cds[2] = s.cooldownSeconds;
-        h.castT = this.time;
-        this.reveal(h);
-        this.events.push({ type: 'triangle', t: this.time, x, y, pts: [a, b, p], hits });
-        return { ok: true };
+            else if (s.kind === 'zone') {
+                if (d < s.castRange - 8 && t.kind === 'hero')
+                    this.castSkill(i, aim, h);
+            }
+            else if (s.kind === 'buff') {
+                if (h.hp < h.maxHp * 0.7 || (t.kind === 'hero' && d < 120))
+                    this.castSkill(i, aim, h);
+            }
+        });
     }
+    // ---------------------------------------------------------------- 技能
+    /** 弦月 / 定星的便捷入口（测试和调试用）；实际结算都在 castSkill */
+    castCrescent(dx, dy) { return this.castSkill(0, { x: this.player.x + dx, y: this.player.y + dy, dx, dy }); }
+    castBeacon(x, y) { return this.castSkill(1, { x, y, dx: x - this.player.x, dy: y - this.player.y }); }
     /** 某英雄的三个技能定义。星璃沿用 rules.xingli.skills，其余读 rules.heroes[id].skills */
     skillsOf(h = this.player) { return h.sprite === 'xingli' ? this.rules.xingli.skills : (this.rules.heroes?.[h.sprite]?.skills ?? []); }
     heroDef(id) { return this.rules.heroes?.[id]; }
-    /** 通用技能出手（星璃以外的英雄）。(dx, dy) = 瞄准方向，(x, y) = 落点。按 kind 结算。 */
+    /** 通用技能出手（六名英雄都走这里）。(dx, dy) = 瞄准方向，(x, y) = 落点。按 kind 结算。 */
     castSkill(i, aim, h = this.player) {
         if (this.over)
             return { ok: false, reason: 'over' };
@@ -749,6 +667,7 @@ export class Game {
         }
         dx /= L;
         dy /= L;
+        const fx = `fx-${h.sprite}-${s.id}`;
         const T = this.time, slow = s.slowFraction ? [s.slowFraction, s.slowSeconds ?? 1] : undefined;
         const hitFx = (u) => {
             u.revealUntil = T + 1.5;
@@ -764,7 +683,7 @@ export class Game {
             this.events.push({ type: 'hit', t: T, x: u.x, y: u.y });
         };
         if (s.kind === 'line') {
-            this.crescents.push({ x: h.x, y: h.y, dx, dy, left: s.range, hit: new Set(), src: h, width: s.width ?? 20, damage: s.damage ?? 0, style: 'bolt', slow });
+            this.crescents.push({ x: h.x, y: h.y, dx, dy, left: s.range, hit: new Set(), src: h, width: s.width ?? 20, damage: s.damage ?? 0, style: h.sprite === 'xingli' ? 'crescent' : 'bolt', slow, ret: s.returns ? s.returnDamageFraction ?? 0.5 : 0, mark: s.markSeconds ?? 0, fx });
             h.faceX = dx;
             h.faceY = dy;
         }
@@ -774,13 +693,28 @@ export class Game {
             for (const u of this.enemiesOf(h.team))
                 if (Math.hypot(u.x - aim.x, u.y - aim.y) <= s.radius + u.r * 0.5) {
                     hitFx(u);
-                    this.damage(h, u, s.damage ?? 0);
+                    let dmg = s.damage ?? 0;
+                    if (s.markBonusDamage && u.moonUntil > T) { // 引爆月痕：额外伤害 + 定身，月痕消耗
+                        dmg += s.markBonusDamage;
+                        u.moonUntil = 0;
+                        if (s.markRootSeconds)
+                            u.rootUntil = Math.max(u.rootUntil, T + s.markRootSeconds);
+                        this.events.push({ type: 'detonate', t: T, x: u.x, y: u.y });
+                    }
+                    this.damage(h, u, dmg);
                 }
             if (s.healAllies)
                 for (const a of this.heroes)
                     if (a.team === h.team && a.alive && Math.hypot(a.x - aim.x, a.y - aim.y) <= s.radius + a.r)
                         a.hp = Math.min(a.maxHp, a.hp + s.healAllies);
-            this.events.push({ type: 'beacon', t: T, x: aim.x, y: aim.y, r: s.radius });
+            this.events.push({ type: 'beacon', t: T, x: aim.x, y: aim.y, r: s.radius, fx });
+        }
+        else if (s.kind === 'zone') {
+            if (Math.hypot(aim.x - h.x, aim.y - h.y) > s.castRange + 0.5)
+                return { ok: false, reason: 'range' };
+            const tick = s.tickSeconds ?? 0.5;
+            this.zones.push({ x: aim.x, y: aim.y, r: s.radius, born: T, until: T + (s.seconds ?? 3), next: T + tick, tick, dmg: s.tickDamage ?? 0, slow: s.slowFraction ?? 0, final: s.finalDamage ?? 0, finalRoot: s.finalRootSeconds ?? 0, src: h });
+            this.events.push({ type: 'zone', t: T, x: aim.x, y: aim.y, r: s.radius });
         }
         else if (s.kind === 'cone') {
             const half = ((s.angleDeg ?? 90) * Math.PI) / 360;
@@ -795,7 +729,7 @@ export class Game {
             }
             h.faceX = dx;
             h.faceY = dy;
-            this.events.push({ type: 'cone', t: T, x: h.x, y: h.y, dx, dy, r: s.range, angle: half * 2 });
+            this.events.push({ type: 'cone', t: T, x: h.x, y: h.y, dx, dy, r: s.range, angle: half * 2, fx });
         }
         else if (s.kind === 'dash') {
             h.dash = { dx, dy, left: s.range, damage: s.damage ?? 0, stun: s.stunSeconds ?? 0, hit: new Set() };
@@ -811,6 +745,7 @@ export class Game {
                 if (sh) {
                     a.shield = Math.max(a.shield, sh);
                     a.shieldUntil = T + dur;
+                    a.shieldFx = fx;
                 }
                 if (hl)
                     a.hp = Math.min(a.maxHp, a.hp + hl);
@@ -835,7 +770,7 @@ export class Game {
         h.cds[i] = s.cooldownSeconds;
         h.castT = T;
         this.reveal(h);
-        this.events.push({ type: 'cast', t: T, x: h.x, y: h.y, skill: 0 });
+        this.events.push({ type: 'cast', t: T, x: h.x, y: h.y, skill: s.kind === 'line' ? 0 : i });
         return { ok: true };
     }
     /** 突进：高速直线位移（撞到障碍会被挡住），沿途每个敌人结算一次伤害（可带眩晕）。期间不接受移动和普攻。 */
@@ -862,6 +797,33 @@ export class Game {
         if (d.left <= 0.01 || Math.hypot(h.x - px, h.y - py) < step * 0.35)
             h.dash = null; // 走完或被挡住
     }
+    updateZones() {
+        const T = this.time;
+        for (const z of this.zones) {
+            const inside = () => this.enemiesOf(z.src.team).filter((u) => Math.hypot(u.x - z.x, u.y - z.y) <= z.r + u.r * 0.5);
+            while (z.next <= T + 1e-9 && z.next <= z.until + 1e-9) {
+                for (const u of inside()) {
+                    u.revealUntil = T + 1.5;
+                    if (z.slow) {
+                        u.slowUntil = Math.max(u.slowUntil, T + z.tick + 0.15);
+                        u.slowFrac = z.slow;
+                    }
+                    this.damage(z.src, u, z.dmg);
+                    this.events.push({ type: 'hit', t: T, x: u.x, y: u.y });
+                }
+                z.next += z.tick;
+            }
+            if (T >= z.until) {
+                for (const u of inside()) {
+                    if (z.finalRoot)
+                        u.rootUntil = Math.max(u.rootUntil, T + z.finalRoot);
+                    this.damage(z.src, u, z.final);
+                }
+                this.events.push({ type: 'beacon', t: T, x: z.x, y: z.y, r: z.r }, { type: 'zoneEnd', t: T, x: z.x, y: z.y });
+            }
+        }
+        this.zones = this.zones.filter((z) => T < z.until);
+    }
     updateCrescents(dt) {
         const speed = 430;
         for (const c of this.crescents) {
@@ -874,6 +836,8 @@ export class Game {
                 if (Math.hypot(c.x + c.dx * t - u.x, c.y + c.dy * t - u.y) <= s.width / 2 + u.r) {
                     c.hit.add(u.id);
                     u.revealUntil = this.time + 1.5;
+                    if (c.mark)
+                        u.moonUntil = this.time + c.mark;
                     if (c.slow) {
                         u.slowUntil = this.time + c.slow[1];
                         u.slowFrac = c.slow[0];
@@ -885,6 +849,17 @@ export class Game {
             c.x = nx;
             c.y = ny;
             c.left -= stepLen;
+            if (c.left <= 0.01 && c.ret > 0 && !c.back && c.src.alive) { // 到头折返：朝施法者当前位置飞回，重新结算一轮（伤害打折）
+                const bx = c.src.x - c.x, by = c.src.y - c.y, L = Math.hypot(bx, by);
+                if (L > 12) {
+                    c.back = true;
+                    c.dx = bx / L;
+                    c.dy = by / L;
+                    c.left = L;
+                    c.damage *= c.ret;
+                    c.hit = new Set();
+                }
+            }
         }
         this.crescents = this.crescents.filter((c) => c.left > 0.01);
     }

@@ -133,10 +133,12 @@ async function boot() {
     cam.snap(game.player.x, game.player.y);
     // —— 英雄选择面板（DOM）：六名英雄，点一下就以该英雄重开一局 ——
     const pickEl = document.getElementById('pick'), swapEl = document.getElementById('swap');
+    const swapFace = () => { if (!swapEl)
+        return; swapEl.innerHTML = ''; const im = document.createElement('img'); im.alt = ''; im.src = `assets/art/portrait-${game.playerHero}.png`; im.onerror = () => im.remove(); swapEl.appendChild(im); swapEl.appendChild(document.createTextNode('换英雄')); };
     const pickHero = (id) => { if (!heroIds.includes(id))
         return false; game.playerHero = id; restart(); selecting = false; if (pickEl)
         pickEl.style.display = 'none'; if (swapEl)
-        swapEl.style.display = 'block'; return true; };
+        swapEl.style.display = 'flex'; swapFace(); return true; };
     const openPick = () => {
         if (!pickEl)
             return;
@@ -180,7 +182,8 @@ async function boot() {
     };
     if (swapEl) {
         swapEl.addEventListener('click', openPick);
-        swapEl.style.display = heroIds.length > 1 ? 'block' : 'none';
+        swapEl.style.display = heroIds.length > 1 ? 'flex' : 'none';
+        swapFace();
     }
     if (heroIds.length > 1 && !heroIds.includes(heroQ) && !paused && !game.autopilot)
         openPick();

@@ -101,6 +101,15 @@ export class Sfx {
                 case 'buff':
                     this.play('beacon-placed', 0.7 * near, 1.2);
                     break;
+                case 'zone':
+                    this.play('beacon-placed', 1 * near, 0.75);
+                    break;
+                case 'zoneEnd':
+                    this.play('constellation-close', 1 * near);
+                    break;
+                case 'detonate':
+                    this.play('attack-hit', 0.9 * near, 1.3);
+                    break;
                 case 'structHit':
                     if (e.t - this.lastStruct > 0.16) {
                         this.lastStruct = e.t;

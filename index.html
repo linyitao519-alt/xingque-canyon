@@ -13,7 +13,8 @@
   body { position: fixed; inset: 0; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
   #gl { position: absolute; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: block; }
   #fps { position: fixed; left: 50%; bottom: 3px; transform: translateX(-50%); padding: 1px 8px; border-radius: 6px; background: rgba(0,0,0,.45); color: #d8f5e6; font: 10px/1.5 ui-monospace, Menlo, monospace; pointer-events: none; white-space: nowrap; }
-  #swap { display: none; position: fixed; left: max(12px, env(safe-area-inset-left, 0px)); top: 37vh; padding: 5px 12px; border-radius: 14px; border: 1px solid rgba(255,233,168,.7); background: rgba(10,26,30,.72); color: #ffe9a8; font: 600 12px/1.2 system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  #swap img { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; pointer-events: none; }
+  #swap { display: none; align-items: center; gap: 5px; position: fixed; left: max(12px, env(safe-area-inset-left, 0px)); top: 37vh; padding: 3px 11px 3px 4px; border-radius: 16px; border: 1px solid rgba(255,233,168,.7); background: rgba(10,26,30,.72); color: #ffe9a8; font: 600 12px/1.2 system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; }
   #pick { display: none; position: fixed; inset: 0; z-index: 5; flex-direction: column; align-items: center; justify-content: center; gap: 2.2vh; background: rgba(8,20,24,.9); color: #e6f3ef; font-family: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
     padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
   .pick-title { font-weight: 700; font-size: 5.2vh; letter-spacing: .2em; }

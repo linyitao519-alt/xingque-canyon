@@ -98,7 +98,8 @@ async function boot(): Promise<void> {
 
   // —— 英雄选择面板（DOM）：六名英雄，点一下就以该英雄重开一局 ——
   const pickEl = document.getElementById('pick'), swapEl = document.getElementById('swap');
-  const pickHero = (id: string) => { if (!heroIds.includes(id)) return false; game.playerHero = id; restart(); selecting = false; if (pickEl) pickEl.style.display = 'none'; if (swapEl) swapEl.style.display = 'block'; return true; };
+  const swapFace = () => { if (!swapEl) return; swapEl.innerHTML = ''; const im = document.createElement('img'); im.alt = ''; im.src = `assets/art/portrait-${game.playerHero}.png`; im.onerror = () => im.remove(); swapEl.appendChild(im); swapEl.appendChild(document.createTextNode('换英雄')); };
+  const pickHero = (id: string) => { if (!heroIds.includes(id)) return false; game.playerHero = id; restart(); selecting = false; if (pickEl) pickEl.style.display = 'none'; if (swapEl) swapEl.style.display = 'flex'; swapFace(); return true; };
   const openPick = () => {
     if (!pickEl) return;
     selecting = true; hud.resetTouches(); pickEl.innerHTML = ''; pickEl.style.display = 'flex'; if (swapEl) swapEl.style.display = 'none';
@@ -114,7 +115,7 @@ async function boot(): Promise<void> {
       card.addEventListener('click', () => pickHero(id)); row.appendChild(card);
     }
   };
-  if (swapEl) { swapEl.addEventListener('click', openPick); swapEl.style.display = heroIds.length > 1 ? 'block' : 'none'; }
+  if (swapEl) { swapEl.addEventListener('click', openPick); swapEl.style.display = heroIds.length > 1 ? 'flex' : 'none'; swapFace(); }
   if (heroIds.length > 1 && !heroIds.includes(heroQ) && !paused && !game.autopilot) openPick();
 
   let last = performance.now();

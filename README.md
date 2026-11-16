@@ -22,7 +22,7 @@ A single-player 3-lane mobile MOBA prototype that runs in the browser. Code writ
 
 在线试玩：https://linyitao519-alt.github.io/xingque-canyon/
 
-这是原型：五名新英雄的技能图标和特效还是矢量占位，AI 英雄暂时只用普攻；中路这一屏打磨得最细，另外两路和基地的布景还是程序生成的；野怪未实装；真机帧率和手感仍在验证。
+这是原型：AI 英雄暂时只用普攻，英雄数值还没做平衡；中路这一屏打磨得最细，另外两路和基地的布景还是程序生成的；野怪未实装；真机帧率和手感仍在验证。
 
 ## 直接玩
 

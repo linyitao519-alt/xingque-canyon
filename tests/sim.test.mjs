@@ -141,33 +141,32 @@ test('塔优先打小兵；敌方英雄在塔下攻击己方英雄时立即转�
   assert.equal(tw.target, p);
 });
 
-test('星璃技能：弦月、定星（最多两枚星标）、三星结界（缺标记/面积不足时取消且不进冷却）', () => {
+test('星璃技能：弦月去而复返并留月痕，定星引爆月痕定身，星河阵持续结算后爆发', () => {
   const g = mk(), p = g.player, [S0, S1, S2] = rules.xingli.skills;
   p.x = 600; p.y = 700; g.update(1 / 30);
   const a = dummy(g, 680, 700), far = dummy(g, 600 + S0.range + 40, 700);
-  assert.ok(g.castCrescent(1, 0).ok); run(g, 0.6);
-  assert.equal(a.hp, 1000 - S0.damage, '弦月命中'); assert.equal(far.hp, 1000, '射程外不命中');
-  assert.ok(p.cds[0] > S0.cooldownSeconds - 1); assert.equal(g.castCrescent(1, 0).reason, 'cooldown');
-  // 三星结界：缺标记
-  assert.equal(g.castConstellation(650, 660).reason, 'marks'); assert.equal(p.cds[2], 0);
-  // 定星
+  // 弦月：去程全额，回程打折，射程外不命中；命中留下月痕
+  assert.ok(g.castCrescent(1, 0).ok); run(g, 0.25);
+  assert.equal(a.hp, 1000 - S0.damage, '去程命中'); assert.ok(a.moonUntil > g.time, '留下月痕');
+  run(g, 0.9);
+  assert.ok(Math.abs(a.hp - (1000 - S0.damage * (1 + S0.returnDamageFraction))) < 1e-6, `回程再命中一次（打折），实际 ${a.hp}`);
+  assert.equal(far.hp, 1000, '射程外不命中'); assert.equal(g.crescents.length, 0, '飞回后消失');
+  assert.ok(p.cds[0] > 0); assert.equal(g.castCrescent(1, 0).reason, 'cooldown');
+  // 定星：超射程取消且不进冷却；命中带月痕的目标 → 额外伤害 + 定身，月痕消耗
   assert.equal(g.castBeacon(p.x + S1.castRange + 30, p.y).reason, 'range'); assert.equal(p.cds[1], 0);
-  assert.ok(g.castBeacon(680, 690).ok);
-  assert.equal(a.hp, 1000 - S0.damage - S1.damage, '定星伤害'); assert.ok(a.slowUntil > g.time && a.slowFrac === S1.slowFraction, '定星减速');
-  p.cds[1] = 0; g.castBeacon(650, 740); p.cds[1] = 0; g.castBeacon(700, 740);
-  assert.equal(g.marks.length, S1.maxActiveMarks, '只保留最近两枚');
-  assert.deepEqual(g.marks.map((m) => [m.x, m.y]), [[650, 740], [700, 740]]);
-  // 面积不足 / 超射程 → 取消，冷却和星标都保留
-  assert.equal(g.castConstellation(675, 741).reason, 'area');
-  assert.equal(g.castConstellation(p.x, p.y - S2.castRange - 20).reason, 'range');
-  assert.equal(p.cds[2], 0); assert.equal(g.marks.length, 2);
-  // 成功：三角内命中 + 定身，消耗星标并进冷却
-  const hp0 = a.hp; a.y = 720; a.x = 676;
-  assert.ok(g.castConstellation(676, 690).ok);
-  assert.equal(a.hp, hp0 - S2.damage); assert.ok(a.rootUntil > g.time);
-  assert.equal(g.marks.length, 0); assert.equal(p.cds[2], S2.cooldownSeconds);
-  // 星标寿命
-  p.cds[1] = 0; g.castBeacon(650, 740); run(g, S1.markLifetimeSeconds + 0.2); assert.equal(g.marks.length, 0, '星标到时消失');
+  let hp = a.hp; assert.ok(a.moonUntil > g.time);
+  assert.ok(g.castBeacon(680, 695).ok);
+  assert.ok(Math.abs(a.hp - (hp - S1.damage - S1.markBonusDamage)) < 1e-6, '引爆月痕的额外伤害'); assert.ok(a.rootUntil > g.time, '定身'); assert.equal(a.moonUntil, 0, '月痕消耗');
+  assert.ok(a.slowUntil > g.time && a.slowFrac === S1.slowFraction, '减速');
+  // 没有月痕时只有基础伤害、不定身
+  run(g, 2); p.cds[1] = 0; hp = a.hp; a.rootUntil = 0; assert.ok(g.castBeacon(680, 695).ok); assert.ok(Math.abs(a.hp - (hp - S1.damage)) < 1e-6); assert.equal(a.rootUntil, 0);
+  // 星河阵：超射程取消；持续期间每 tick 结算，结束时爆发并定身；阵外不受影响
+  assert.equal(g.castSkill(2, { x: p.x, y: p.y - S2.castRange - 20, dx: 0, dy: -1 }).reason, 'range'); assert.equal(p.cds[2], 0);
+  hp = a.hp; const hpFar = far.hp; a.rootUntil = 0;
+  assert.ok(g.castSkill(2, { x: 680, y: 700, dx: 1, dy: 0 }).ok); assert.equal(g.zones.length, 1); assert.equal(p.cds[2], S2.cooldownSeconds);
+  run(g, S2.tickSeconds * 2 + 0.1); assert.ok(Math.abs(a.hp - (hp - S2.tickDamage * 2)) < 1e-6, `两跳后 ${hp - a.hp}`); assert.ok(a.slowUntil > g.time && a.slowFrac === S2.slowFraction);
+  run(g, S2.seconds); const ticks = Math.round(S2.seconds / S2.tickSeconds);
+  assert.ok(Math.abs(a.hp - (hp - S2.tickDamage * ticks - S2.finalDamage)) < 1e-6, `总伤害 ${hp - a.hp}`); assert.equal(g.zones.length, 0); assert.equal(far.hp, hpFar, '阵外不受伤');
 });
 
 test('普攻选敌：英雄 > 小兵 > 可攻击建筑；按住普攻能打出伤害', () => {
@@ -228,9 +227,9 @@ test('整局（JSON 原始数值，玩家挂机）：红方按塔序推穿并摧
   assert.ok(LANES.some((l) => g.towersBy.blue[l].every((t) => !t.alive)), '至少一路被打穿');
   const snap = [g.time, g.minions.length, g.projectiles.length, g.cores.red.hp];
   g.update(5); assert.deepEqual([g.time, g.minions.length, g.projectiles.length, g.cores.red.hp], snap, '结算后不再生成小兵和攻击');
-  g.player.cds = [3, 2, 9]; g.marks.push({ x: 1, y: 1, expire: 9999, born: 0 });
+  g.player.cds = [3, 2, 9]; g.zones.push({ x: 1, y: 1, r: 9, born: 0, until: 9999, next: 9999, tick: 1, dmg: 0, slow: 0, final: 0, finalRoot: 0, src: g.player });
   g.reset();
-  assert.equal(g.over, false); assert.equal(g.time, 0); assert.equal(g.minions.length, 0); assert.equal(g.marks.length, 0);
+  assert.equal(g.over, false); assert.equal(g.time, 0); assert.equal(g.minions.length, 0); assert.equal(g.zones.length, 0);
   assert.ok(g.towers.length === 18 && g.towers.every((t) => t.alive && t.hp === rules.tower.hp));
   assert.ok(TEAMS.every((t) => g.cores[t].alive && g.cores[t].hp === rules.core.hp));
   assert.ok(g.heroes.every((h) => h.alive && h.hp === h.maxHp && h.revealUntil === 0 && h.cds.every((c) => c === 0)));
@@ -238,9 +237,10 @@ test('整局（JSON 原始数值，玩家挂机）：红方按塔序推穿并摧
   run(g, 6); assert.equal(g.minions.length, 18, '重开后重新出兵');
 });
 
-test('整局（AI 代打星璃）：原始 480 秒上限内判平局；放宽上限后蓝方按塔序推穿中路并摧毁水晶', () => {
+test('整局（AI 代打星璃）：480 秒上限内必定结算（提前分出胜负或到时判平）；放宽上限后蓝方按塔序推穿中路并摧毁水晶', () => {
   const a = mk(); a.autopilot = true; run(a, 481);
-  assert.ok(a.over && a.winner === 'draw' && Math.abs(a.time - rules.mode.maxSeconds) < 0.1, '到达时间上限判平局');
+  assert.ok(a.over && (a.winner === 'draw' ? Math.abs(a.time - rules.mode.maxSeconds) < 0.1 : a.time < rules.mode.maxSeconds), `结算 ${a.winner} @${a.time.toFixed(0)}s`);
+  console.log(`    代打星璃整局：${a.winner} @${a.time.toFixed(0)}s`);
   const g = mk({ mode: { ...rules.mode, maxSeconds: 900 } }); g.autopilot = true; const order = [];
   run(g, 900, () => { for (const t of g.towersBy.red.mid) if (!t.alive && !order.includes(t.order)) order.push(t.order); });
   assert.ok(g.over && g.winner === 'blue', `实际结果 ${g.winner} @${g.time.toFixed(0)}s`);
