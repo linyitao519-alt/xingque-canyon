@@ -247,3 +247,47 @@ test('整局（AI 代打星璃）：原始 480 秒上限内判平局；放宽上
   assert.deepEqual(order, [1, 2, 3]);
   assert.ok(g.player.cds.some((c) => c > 0) || g.player.kills > 0, '代打使用了技能或取得击杀');
 });
+
+// ---------------------------------------------------------------- 六名英雄可选
+import { HERO_IDS as __IDS } from '../dist/sim.js';
+test('六名英雄：换人后玩家在蓝方中路，被换下的星璃顶替原位置；数值来自 rules.heroes', () => {
+  for (const id of __IDS) {
+    const g = new Game(structuredClone(map), structuredClone(rules)); g.playerHero = id; g.reset();
+    const d = rules.heroes[id];
+    assert.equal(g.player.sprite, id); assert.equal(g.player.team, 'blue'); assert.equal(g.player.lane, 'mid');
+    assert.equal(g.heroes.length, 6); assert.equal(new Set(g.heroes.map((h) => h.sprite)).size, 6, '六人各不相同');
+    assert.equal(g.heroes.filter((h) => h.team === 'blue').length, 3);
+    assert.equal(g.player.maxHp, d.hp ?? rules.heroDefaults.hp);
+    assert.equal(g.player.ba.range, (d.basicAttack ?? rules.heroDefaults.basicAttack).range);
+    assert.equal(g.skillsOf().length, 3);
+  }
+});
+test('通用技能：直线、落点、扇形、突进、增益各自按规则结算并进入冷却', () => {
+  const mk = (id) => { const g = new Game(structuredClone(map), structuredClone(rules)); g.playerHero = id; g.reset(); const p = g.player; p.x = 600; p.y = 600;
+    const e = g.heroes.find((h) => h.team === 'red'); e.x = 630; e.y = 600; e.hp = e.maxHp = 1000; for (const h of g.heroes) if (h !== p && h !== e) { h.x = 100; h.y = 1100; } return { g, p, e }; };
+  for (const id of __IDS.filter((i) => i !== 'xingli')) {
+    rules.heroes[id].skills.forEach((s, i) => {
+      const { g, p, e } = mk(id); const hp0 = e.hp, php = (p.hp = p.maxHp - 150);
+      if (s.kind === 'ground-circle') { const r = g.castSkill(i, { x: e.x, y: e.y, dx: 1, dy: 0 }); assert.ok(r.ok); assert.equal(g.castSkill(i, { x: e.x, y: e.y, dx: 1, dy: 0 }).reason, 'cooldown'); }
+      else assert.ok(g.castSkill(i, { x: e.x, y: e.y, dx: 1, dy: 0 }).ok, `${id} ${s.name}`);
+      for (let k = 0; k < 30; k++) { e.x = Math.max(e.x, 615); g.update(1 / 60); }
+      assert.equal(p.cds[i] > 0, true, `${id} ${s.name} 进入冷却`);
+      if (s.damage) assert.ok(e.hp <= hp0 - s.damage + 1e-6, `${id} ${s.name} 造成伤害 ${hp0 - e.hp}`);
+      if (s.kind === 'dash') assert.ok(p.x > 615 && !p.dash, `${id} ${s.name} 位移到 ${p.x.toFixed(0)}`);
+      if (s.shield) assert.ok(p.shield > 0);
+      if (s.heal) assert.ok(p.hp > php);
+      if (s.attackIntervalMultiplier) assert.ok(g.time < p.atkBuffUntil);
+    });
+  }
+  // 护盾先扣
+  const { g, p, e } = mk('xuanyuan'); g.castSkill(2, { x: p.x, y: p.y, dx: 1, dy: 0 }); const hp = p.hp; g.damage(e, p, 100); assert.equal(p.hp, hp); assert.equal(p.shield, 60);
+  // 眩晕期间不能出手
+  const a = mk('chiyan'); a.g.castSkill(2, { x: a.e.x, y: a.e.y, dx: 1, dy: 0 }); for (let k = 0; k < 12; k++) a.g.update(1 / 60); assert.ok(a.e.stunned, '被破阵眩晕');
+});
+test('六名英雄各自托管打一局：都能跑到结算，不报错', () => {
+  for (const id of __IDS) {
+    const g = new Game(structuredClone(map), structuredClone(rules)); g.playerHero = id; g.reset(); g.autopilot = true;
+    let n = 0; while (!g.over && n++ < 40000) g.update(1 / 30);
+    assert.ok(g.over, `${id} 一局结束`);
+  }
+});

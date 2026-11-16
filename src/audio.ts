@@ -60,6 +60,9 @@ export class Sfx {
         case 'hit': if (e.t - this.lastHit > 0.07) { this.lastHit = e.t; this.play('attack-hit', 0.55 * near); } break;
         case 'beacon': this.play('beacon-placed', 0.9); break;
         case 'triangle': this.play('constellation-close', 1); break;
+        case 'cone': this.play('attack-hit', 0.75 * near, 0.8); break;
+        case 'dash': this.play('attack-cast', 0.8 * near, 1.25); break;
+        case 'buff': this.play('beacon-placed', 0.7 * near, 1.2); break;
         case 'structHit': if (e.t - this.lastStruct > 0.16) { this.lastStruct = e.t; this.play('tower-hit', 0.6 * near); } break;
         case 'towerDown': this.play('tower-destroyed', 0.4 + 0.6 * near); break;
         case 'coreDown': this.play('tower-destroyed', 1, 0.8); break;

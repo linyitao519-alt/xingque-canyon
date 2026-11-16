@@ -80,6 +80,14 @@ with sync_playwright() as p:
           e.x = b.center[0] + b.radius + 3; __xq.advance(1 / 30); out.enemyLeftVisible = see();
           return out; }""", bi)
         check(f'{label}：敌人在草里时草外看不到；玩家踩进判定圆边缘就能看到；退出后再次看不到；敌人走出草丛立即可见', r['style'] == (2 if label == '野区紧凑草' else 1) and all(v for k, v in r.items() if k != 'style'), r)
+    # 英雄选择：不带 ?hero 时开局弹出并暂停；触摸卡片选人；"换英雄"按钮可重新打开
+    pk = ctx.new_page(); pk.on('pageerror', lambda e: errs.append(str(e))); pk.goto(URL + '?mute=1&fps=0&r=canvas'); pk.wait_for_function('window.__xq && __xq.renderer.sceneReady'); pk.wait_for_timeout(700)
+    s0 = pk.evaluate('[__xq.selecting(), document.querySelectorAll(".pick-card").length, __xq.game.time]')
+    pk.tap('.pick-card[data-hero="yelan"]'); pk.wait_for_timeout(600)
+    s1 = pk.evaluate('({sel: __xq.selecting(), hero: __xq.game.player.sprite, team: __xq.game.player.team, lane: __xq.game.player.lane, xingliTeam: __xq.game.heroes.find(h => h.sprite === "xingli").team, t: __xq.game.time, skills: __xq.game.skillsOf().map(s => s.name)})')
+    pk.tap('#swap'); pk.wait_for_timeout(300); s2 = pk.evaluate('__xq.selecting()'); pk.tap('.pick-card[data-hero="xingli"]'); pk.wait_for_timeout(300); s3 = pk.evaluate('[__xq.selecting(), __xq.game.player.sprite, __xq.game.heroes.find(h => h.sprite === "yelan").team]')
+    check('英雄选择：开局弹出 6 张卡并暂停；触摸选夜岚 → 她到蓝方中路、星璃顶替到红方、对局开始；"换英雄"能重新打开并换回星璃', s0[0] and s0[1] == 6 and s0[2] == 0 and not s1['sel'] and s1['hero'] == 'yelan' and s1['team'] == 'blue' and s1['lane'] == 'mid' and s1['xingliTeam'] == 'red' and s1['t'] > 0 and s2 and s3 == [False, 'xingli', 'red'], [s0, s1, s3])
+    pk.close()
     check('全程无脚本报错', not errs, errs[:3])
     b.close()
 print(f'\n{sum(results)}/{len(results)} 项通过'); sys.exit(0 if all(results) else 1)

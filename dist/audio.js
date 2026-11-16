@@ -92,6 +92,15 @@ export class Sfx {
                 case 'triangle':
                     this.play('constellation-close', 1);
                     break;
+                case 'cone':
+                    this.play('attack-hit', 0.75 * near, 0.8);
+                    break;
+                case 'dash':
+                    this.play('attack-cast', 0.8 * near, 1.25);
+                    break;
+                case 'buff':
+                    this.play('beacon-placed', 0.7 * near, 1.2);
+                    break;
                 case 'structHit':
                     if (e.t - this.lastStruct > 0.16) {
                         this.lastStruct = e.t;

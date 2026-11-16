@@ -561,9 +561,38 @@ export class Renderer {
 
   private see(u: Unit): boolean { return u.alive && this.game.visible(u, 'blue'); }
 
+  /** 通用技能的贴地特效（矢量画法）：扇形挥击、突进拖尾、增益光环、护盾环、加速标记。 */
+  private drawSkillFx(): void {
+    const c = this.ctx, g = this.game, T = g.time;
+    const rgb = (hex: string) => { const n = parseInt(hex.slice(1), 16); return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`; };
+    for (const e of g.events) {
+      const age = T - e.t;
+      if (e.type === 'cone' && age < 0.28) {
+        const k = age / 0.28, a0 = Math.atan2(e.dy, e.dx), half = e.angle / 2;
+        c.beginPath(); c.moveTo(e.x, e.y); c.arc(e.x, e.y, e.r * (0.55 + 0.45 * k), a0 - half, a0 + half); c.closePath();
+        c.fillStyle = `rgba(255,240,210,${0.42 * (1 - k)})`; c.fill();
+        c.strokeStyle = `rgba(255,255,255,${0.9 * (1 - k)})`; c.lineWidth = 2.2; c.beginPath(); c.arc(e.x, e.y, e.r * (0.55 + 0.45 * k), a0 - half, a0 + half); c.stroke();
+      } else if (e.type === 'dash' && age < 0.36) {
+        const k = age / 0.36, len = Math.min(e.r, 460 * age);
+        c.strokeStyle = `rgba(255,255,255,${0.55 * (1 - k)})`; c.lineCap = 'round';
+        for (const off of [-5, 0, 5]) { c.lineWidth = off ? 1.4 : 3; c.beginPath(); c.moveTo(e.x - e.dy * off, e.y + e.dx * off); c.lineTo(e.x + e.dx * len - e.dy * off, e.y + e.dy * len + e.dx * off); c.stroke(); }
+      } else if (e.type === 'buff' && age < 0.6) {
+        const k = age / 0.6;
+        c.strokeStyle = `rgba(190,255,225,${0.9 * (1 - k)})`; c.lineWidth = 3 * (1 - k) + 0.8; c.beginPath(); c.arc(e.x, e.y, e.r * (0.3 + 0.7 * k), 0, 7); c.stroke();
+        c.fillStyle = `rgba(190,255,225,${0.16 * (1 - k)})`; c.beginPath(); c.arc(e.x, e.y, e.r * (0.3 + 0.7 * k), 0, 7); c.fill();
+      }
+    }
+    for (const h of g.heroes) {
+      if (!this.see(h)) continue;
+      if (h.shield > 0) { c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 1.6; c.setLineDash([5, 4]); c.beginPath(); c.arc(h.x, h.y, 15.5, 0, 7); c.stroke(); c.setLineDash([]); }
+      if (T < h.hasteUntil || T < h.atkBuffUntil) { const col = rgb(g.heroDef(h.sprite)?.color ?? '#ffe9a8'), a = T * 5; c.strokeStyle = `rgba(${col},.9)`; c.lineWidth = 1.8; for (let i = 0; i < 3; i++) { c.beginPath(); c.arc(h.x, h.y, 17.5, a + i * 2.09, a + i * 2.09 + 0.9); c.stroke(); } }
+      if (h.stunned && T < h.rootUntil) { c.fillStyle = 'rgba(255,235,150,.95)'; for (let i = 0; i < 3; i++) { const a = T * 6 + i * 2.09; c.beginPath(); c.arc(h.x + Math.cos(a) * 9, h.y - 2 + Math.sin(a) * 4, 1.8, 0, 7); c.fill(); } }
+    }
+  }
+
   /** 贴地的提示与特效：塔射程、脚底环、星标、技能瞄准、命中范围。 */
   private drawGroundFx(): void {
-    const c = this.ctx, g = this.game, p = g.player, S = g.rules.xingli.skills, T = g.time, US = Math.max(0.75, Camera.UNIT_SCALE);
+    const c = this.ctx, g = this.game, p = g.player, S = g.skillsOf(p) as any[], T = g.time, US = Math.max(0.75, Camera.UNIT_SCALE);
     // 敌方塔的攻击范围：玩家靠近（射程外 70 单位以内）时显示低透明度的贴地细边线，进入射程后提亮。
     // 半径直接用攻击判定的 t.range；不管塔当前打的是谁（小兵扛塔时也显示）。只画边线不填色，和技能瞄准范围叠在一起时不糊。
     // 被锁定的提示仍是脚下红环 / 屏边箭头。?debug=1 时额外加淡填充。
@@ -642,22 +671,31 @@ export class Renderer {
       c.fillStyle = 'rgba(150,220,255,.25)'; c.fillRect(-40, -S[0].width / 2, 34, S[0].width);
       c.restore();
     }
+    this.drawSkillFx();
     // 技能瞄准提示（按住显示范围）
     const aim = this.hud.aim;
     if (aim && p.alive) {
       const w = this.hud.aimWorld(aim), bad = aim.cancel || !w.ok;
       const col = bad ? '255,110,90' : '140,230,255';
-      if (aim.i === 0) {
+      const sk = S[aim.i], kind: string = sk?.kind ?? 'line';
+      if (kind === 'line' || kind === 'dash') {
+        const wd = sk.width ?? 22, rg = sk.range;
         c.save(); c.translate(p.x, p.y); c.rotate(Math.atan2(w.dy, w.dx));
-        c.fillStyle = `rgba(${col},.26)`; c.fillRect(0, -S[0].width / 2, S[0].range, S[0].width);
-        c.strokeStyle = `rgba(${col},.9)`; c.lineWidth = 1.5; c.strokeRect(0, -S[0].width / 2, S[0].range, S[0].width);
-        c.fillStyle = `rgba(${col},.9)`; c.beginPath(); c.moveTo(S[0].range + 12, 0); c.lineTo(S[0].range, -S[0].width / 2 - 3); c.lineTo(S[0].range, S[0].width / 2 + 3); c.fill();
+        c.fillStyle = `rgba(${col},.26)`; c.fillRect(0, -wd / 2, rg, wd);
+        c.strokeStyle = `rgba(${col},.9)`; c.lineWidth = 1.5; c.strokeRect(0, -wd / 2, rg, wd);
+        c.fillStyle = `rgba(${col},.9)`; c.beginPath(); c.moveTo(rg + 12, 0); c.lineTo(rg, -wd / 2 - 3); c.lineTo(rg, wd / 2 + 3); c.fill();
         c.restore();
+      } else if (kind === 'cone') {
+        const a0 = Math.atan2(w.dy, w.dx), half = ((sk.angleDeg ?? 90) * Math.PI) / 360;
+        c.beginPath(); c.moveTo(p.x, p.y); c.arc(p.x, p.y, sk.range, a0 - half, a0 + half); c.closePath();
+        c.fillStyle = `rgba(${col},.26)`; c.fill(); c.strokeStyle = `rgba(${col},.9)`; c.lineWidth = 1.5; c.stroke();
+      } else if (kind === 'buff') {
+        c.strokeStyle = `rgba(${col},.8)`; c.lineWidth = 1.6; c.fillStyle = `rgba(${col},.1)`; c.beginPath(); c.arc(p.x, p.y, Math.max(18, sk.radius ?? 0), 0, 7); c.fill(); c.stroke();
       } else {
         const range = S[aim.i].castRange;
         c.strokeStyle = `rgba(${col},.75)`; c.lineWidth = 1.6; c.fillStyle = `rgba(${col},.06)`;
         c.beginPath(); c.arc(p.x, p.y, range, 0, 7); c.fill(); c.stroke();
-        if (aim.i === 1) { c.fillStyle = `rgba(${col},.3)`; c.beginPath(); c.arc(w.x, w.y, S[1].radius, 0, 7); c.fill(); c.stroke(); }
+        if (kind === 'ground-circle') { c.fillStyle = `rgba(${col},.3)`; c.beginPath(); c.arc(w.x, w.y, sk.radius, 0, 7); c.fill(); c.stroke(); }
         else {
           if (g.marks.length === 2) { c.beginPath(); c.moveTo(g.marks[0].x, g.marks[0].y); c.lineTo(g.marks[1].x, g.marks[1].y); c.lineTo(w.x, w.y); c.closePath(); c.fillStyle = `rgba(${col},.3)`; c.fill(); c.lineWidth = 2; c.stroke(); }
           c.fillStyle = `rgba(${col},.95)`; c.beginPath(); c.arc(w.x, w.y, 5, 0, 7); c.fill();
@@ -754,7 +792,17 @@ export class Renderer {
     const c = this.ctx, z = this.cam.z;
     const KY = Camera.KY, US = Camera.UNIT_SCALE;
     // 弦月：贴图朝右，月牙在图的右端；按屏幕上的飞行方向旋转，朝左飞时上下翻转保持正立
+    for (const cr of g.crescents) {
+      if (cr.style !== 'bolt') continue;
+      // 通用直线弹：英雄代表色的光梭（没有专属贴图时的画法）
+      const [x, y] = this.cam.toScreen(cr.x, cr.y, 9 * US), ang = Math.atan2(cr.dy * KY, cr.dx), L = 34 * z, wd = Math.max(3, cr.width * 0.3 * z), col = g.heroDef(cr.src.sprite)?.color ?? '#ffe9a8';
+      c.save(); c.translate(x, y); c.rotate(ang);
+      const gr = c.createLinearGradient(-L, 0, L * 0.3, 0); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.7, col); gr.addColorStop(1, '#fff');
+      c.fillStyle = gr; c.beginPath(); c.moveTo(-L, 0); c.quadraticCurveTo(-L * 0.2, -wd, L * 0.3, 0); c.quadraticCurveTo(-L * 0.2, wd, -L, 0); c.fill();
+      c.fillStyle = '#fff'; c.beginPath(); c.arc(L * 0.22, 0, wd * 0.45, 0, 7); c.fill(); c.restore();
+    }
     if (this.fx.crescent) for (const cr of g.crescents) {
+      if (cr.style === 'bolt') continue;
       const [x, y] = this.cam.toScreen(cr.x, cr.y, 9 * US), ang = Math.atan2(cr.dy * KY, cr.dx), L = 48 * z, img = this.fx.crescent;   // 贴图高 = L/2 ≈ 判定宽度 24
       c.save(); c.translate(x, y); c.rotate(ang); if (Math.cos(ang) < 0) c.scale(1, -1);
       c.drawImage(img, -L * 0.86, -L / 4, L, L / 2); c.restore();
@@ -803,6 +851,7 @@ export class Renderer {
       if (!this.see(h)) continue;
       const [x, y] = cam.toScreen(h.x, h.y, (SpriteHeight[h.sprite] ?? 34) * Camera.UNIT_SCALE + 5), w = H * 0.125;
       this.bar(x, y, w, H * 0.017, h.hp / h.maxHp, col(h));
+      if (h.shield > 0) { c.fillStyle = 'rgba(255,255,255,.92)'; c.fillRect(x - w / 2, y - H * 0.006, w * Math.min(1, h.shield / h.maxHp), H * 0.005); }   // 护盾：血条上方的白条
       c.strokeStyle = 'rgba(8,20,22,.6)'; c.lineWidth = 1; c.beginPath();
       for (let v = 100; v < h.maxHp; v += 100) { const tx = x - w / 2 + (w * v) / h.maxHp; c.moveTo(tx, y); c.lineTo(tx, y + H * 0.017); }
       c.stroke();

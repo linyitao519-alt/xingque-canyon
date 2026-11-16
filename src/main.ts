@@ -29,6 +29,11 @@ async function boot(): Promise<void> {
   // 布景里会挡路的岩石和树进入同一套碰撞与寻路
   const game = new Game(map, rules, scenery.props.filter((p: any) => p.blockRadius > 0).map((p: any) => ({ x: p.pos[0], y: p.pos[1], r: p.blockRadius })));
   game.autopilot = q.get('auto') === '1';
+  // 玩家英雄：?hero=<id> 直接指定；否则开局弹出选择面板（暂停和自动对战模式下默认星璃，不弹）
+  const heroIds: string[] = ['xingli', 'xuanyuan', 'hedeng', 'yelan', 'feixian', 'chiyan'].filter((id) => (rules as any).heroes?.[id]);
+  const heroQ = q.get('hero') ?? '';
+  if (heroIds.includes(heroQ) && heroQ !== 'xingli') { game.playerHero = heroQ; game.reset(); }
+  let selecting = false;
   let speed = Math.max(0.1, Math.min(16, Number(q.get('speed')) || 1));
   // 验收截图用：?paused=1 停住实时推进，再用 __xq.step(秒) 以固定步长推进到同一时刻，保证修改前后是同一帧局面
   let paused = q.get('paused') === '1';
@@ -91,11 +96,32 @@ async function boot(): Promise<void> {
   if (Number(q.get('viewh')) === 120) rig.setViewH(120);
   cam.snap(game.player.x, game.player.y);
 
+  // —— 英雄选择面板（DOM）：六名英雄，点一下就以该英雄重开一局 ——
+  const pickEl = document.getElementById('pick'), swapEl = document.getElementById('swap');
+  const pickHero = (id: string) => { if (!heroIds.includes(id)) return false; game.playerHero = id; restart(); selecting = false; if (pickEl) pickEl.style.display = 'none'; if (swapEl) swapEl.style.display = 'block'; return true; };
+  const openPick = () => {
+    if (!pickEl) return;
+    selecting = true; hud.resetTouches(); pickEl.innerHTML = ''; pickEl.style.display = 'flex'; if (swapEl) swapEl.style.display = 'none';
+    const title = document.createElement('div'); title.className = 'pick-title'; title.textContent = '选择英雄'; pickEl.appendChild(title);
+    const row = document.createElement('div'); row.className = 'pick-row'; pickEl.appendChild(row);
+    for (const id of heroIds) {
+      const d = (rules as any).heroes[id], card = document.createElement('button'); card.className = 'pick-card' + (id === game.playerHero ? ' on' : ''); card.dataset.hero = id; card.style.setProperty('--hc', d.color);
+      const img = document.createElement('img'); img.alt = d.name; img.src = `assets/art/hero-${id}.png`; card.appendChild(img);
+      const nm = document.createElement('b'); nm.textContent = d.name; card.appendChild(nm);
+      const role = document.createElement('i'); role.textContent = d.role; card.appendChild(role);
+      const sk = document.createElement('span'); sk.textContent = (id === 'xingli' ? (rules as any).xingli.skills : d.skills).map((s: any) => s.name).join(' · '); card.appendChild(sk);
+      const bl = document.createElement('em'); bl.textContent = d.blurb; card.appendChild(bl);
+      card.addEventListener('click', () => pickHero(id)); row.appendChild(card);
+    }
+  };
+  if (swapEl) { swapEl.addEventListener('click', openPick); swapEl.style.display = heroIds.length > 1 ? 'block' : 'none'; }
+  if (heroIds.length > 1 && !heroIds.includes(heroQ) && !paused && !game.autopilot) openPick();
+
   let last = performance.now();
   const frame = (now: number) => {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     const portrait = window.innerHeight > window.innerWidth;
-    if (!portrait && !document.hidden && !paused) {
+    if (!portrait && !document.hidden && !paused && !selecting) {
       hud.sync();
       game.update(dt * speed);
       sfx.update();
@@ -117,7 +143,7 @@ async function boot(): Promise<void> {
   requestAnimationFrame(frame);
 
   // 验收/调试钩子
-  (window as any).__xq = { game, hud, cam, renderer, restart, backend: () => (renderer.three ? 'three' : 'canvas'), perf, threeError: () => threeError, attach: AttachPos, tuning: { VIEW_H: Camera.VIEW_H, KY: Camera.KY, UNIT_SCALE: Camera.UNIT_SCALE, STRUCT_SCALE: Camera.STRUCT_SCALE, AX: Camera.AX, AY: Camera.AY }, art: art.loaded, setSpeed: (s: number) => { speed = s; },
+  (window as any).__xq = { game, hud, cam, renderer, restart, backend: () => (renderer.three ? 'three' : 'canvas'), pickHero, openPick, selecting: () => selecting, heroIds, perf, threeError: () => threeError, attach: AttachPos, tuning: { VIEW_H: Camera.VIEW_H, KY: Camera.KY, UNIT_SCALE: Camera.UNIT_SCALE, STRUCT_SCALE: Camera.STRUCT_SCALE, AX: Camera.AX, AY: Camera.AY }, art: art.loaded, setSpeed: (s: number) => { speed = s; },
     setPaused: (v: boolean) => { paused = v; }, rig,
     /** 暂停状态下按固定步长推进一帧：输入同步 → 模拟 → 镜头，与实时循环同一条路径（录制对比用） */
     advance: (dt = 1 / 30) => { hud.sync(); game.update(dt); sfx.update(); rig.update(dt); return game.time; },

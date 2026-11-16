@@ -12,7 +12,7 @@ export interface AimWorld { x: number; y: number; dx: number; dy: number; ok: bo
 interface Btn { x: number; y: number; r: number }
 
 const FONT = 'system-ui,"PingFang SC","Microsoft YaHei",sans-serif';
-const REASON: Record<string, string> = { cooldown: '技能冷却中', marks: '需要两枚星标', area: '结界面积不足', range: '超出施法距离', dead: '', over: '' };
+const REASON: Record<string, string> = { busy: '', none: '', cooldown: '技能冷却中', marks: '需要两枚星标', area: '结界面积不足', range: '超出施法距离', dead: '', over: '' };
 
 export class Hud {
   W = 1; H = 1;
@@ -148,29 +148,43 @@ export class Hud {
 
   /** 把瞄准拖动换算到世界坐标：拖满 = 最大施法距离；几乎没拖动 = 自动朝最近的敌人。 */
   aimWorld(a: Aim): AimWorld {
-    const g = this.game, p = g.player, S = g.rules.xingli.skills, mag = Math.hypot(a.ax, a.ay);
+    const g = this.game, p = g.player, S = g.skillsOf(p) as any[], mag = Math.hypot(a.ax, a.ay), kind: string = S[a.i]?.kind ?? 'line';
+    if (kind === 'buff') return { x: p.x, y: p.y, dx: p.faceX, dy: p.faceY, ok: true };
     const auto = mag < 0.18 ? g.pickPlayerTarget(p, 70) : null;
     const tgt = auto && auto.kind !== 'tower' && auto.kind !== 'core' ? auto : null;
-    if (a.i === 0) {
+    if (kind === 'line' || kind === 'cone' || kind === 'dash') {
       let dx = a.ax, dy = a.ay;
       if (mag < 0.18) { if (tgt) { dx = tgt.x - p.x; dy = tgt.y - p.y; } else { dx = p.faceX; dy = p.faceY; } }
       const L = Math.hypot(dx, dy) || 1;
-      return { x: p.x + (dx / L) * S[0].range, y: p.y + (dy / L) * S[0].range, dx: dx / L, dy: dy / L, ok: true };
+      return { x: p.x + (dx / L) * S[a.i].range, y: p.y + (dy / L) * S[a.i].range, dx: dx / L, dy: dy / L, ok: true };
     }
     const range = S[a.i].castRange;
     let x: number, y: number;
     if (mag >= 0.18) { x = p.x + a.ax * range; y = p.y + a.ay * range; }
     else if (tgt) { const d = Math.hypot(tgt.x - p.x, tgt.y - p.y), k = Math.min(1, range / (d || 1)); x = p.x + (tgt.x - p.x) * k; y = p.y + (tgt.y - p.y) * k; }
     else { x = p.x + p.faceX * range * 0.6; y = p.y + p.faceY * range * 0.6; }
-    const chk = a.i === 2 ? g.constellationCheck(x, y) : { ok: true as boolean, reason: undefined as string | undefined };
+    const chk = kind === 'triangle' ? g.constellationCheck(x, y) : { ok: true as boolean, reason: undefined as string | undefined };
     return { x, y, dx: 0, dy: 0, ok: chk.ok, reason: chk.reason };
   }
 
   private release(a: Aim): void {
     const g = this.game, w = this.aimWorld(a);
-    const res = a.i === 0 ? g.castCrescent(w.dx, w.dy) : a.i === 1 ? g.castBeacon(w.x, w.y) : g.castConstellation(w.x, w.y);
+    const res = g.player.sprite !== 'xingli' ? g.castSkill(a.i, w) : a.i === 0 ? g.castCrescent(w.dx, w.dy) : a.i === 1 ? g.castBeacon(w.x, w.y) : g.castConstellation(w.x, w.y);
     this.lastCast = { skill: a.i, ok: res.ok, reason: res.reason };
     if (!res.ok && res.reason && REASON[res.reason]) this.toast = { text: REASON[res.reason], until: performance.now() + 1100 };
+  }
+
+  /** 没有专属图标的技能：按技能类型画一个矢量图形（直线 / 落点 / 扇形 / 突进 / 增益），用英雄的代表色 */
+  private glyph(c: CanvasRenderingContext2D, kind: string, b: Btn, col: string): void {
+    const r = b.r; c.save(); c.translate(b.x, b.y);
+    const g = c.createRadialGradient(0, -r * 0.2, r * 0.1, 0, 0, r); g.addColorStop(0, 'rgba(255,255,255,.16)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.beginPath(); c.arc(0, 0, r, 0, 7); c.fill();
+    c.strokeStyle = col; c.fillStyle = col; c.lineWidth = r * 0.13; c.lineCap = 'round'; c.lineJoin = 'round';
+    if (kind === 'line') { c.rotate(-Math.PI / 4); c.beginPath(); c.moveTo(-r * 0.55, 0); c.lineTo(r * 0.3, 0); c.stroke(); c.beginPath(); c.moveTo(r * 0.62, 0); c.lineTo(r * 0.22, -r * 0.24); c.lineTo(r * 0.22, r * 0.24); c.closePath(); c.fill(); }
+    else if (kind === 'ground-circle') { c.beginPath(); c.ellipse(0, r * 0.12, r * 0.52, r * 0.34, 0, 0, 7); c.stroke(); c.beginPath(); c.arc(0, r * 0.12, r * 0.12, 0, 7); c.fill(); c.beginPath(); c.moveTo(0, -r * 0.62); c.lineTo(0, -r * 0.2); c.stroke(); }
+    else if (kind === 'cone') { c.beginPath(); c.moveTo(-r * 0.05, r * 0.45); c.arc(-r * 0.05, r * 0.45, r * 0.95, -Math.PI * 0.82, -Math.PI * 0.18); c.closePath(); c.globalAlpha *= 0.35; c.fill(); c.globalAlpha /= 0.35; c.stroke(); }
+    else if (kind === 'dash') { for (const k of [-0.34, 0.02, 0.38]) { c.beginPath(); c.moveTo(r * (k - 0.2), -r * 0.36); c.lineTo(r * (k + 0.16), 0); c.lineTo(r * (k - 0.2), r * 0.36); c.stroke(); } }
+    else { c.beginPath(); c.moveTo(0, -r * 0.58); c.lineTo(r * 0.46, -r * 0.36); c.lineTo(r * 0.4, r * 0.18); c.lineTo(0, r * 0.6); c.lineTo(-r * 0.4, r * 0.18); c.lineTo(-r * 0.46, -r * 0.36); c.closePath(); c.stroke(); c.beginPath(); c.moveTo(0, -r * 0.22); c.lineTo(0, r * 0.22); c.moveTo(-r * 0.22, 0); c.lineTo(r * 0.22, 0); c.stroke(); }
+    c.restore();
   }
 
   /** 每帧把摇杆/键盘状态写进模拟层。 */
@@ -234,19 +248,20 @@ export class Hud {
     const s = a.r; c.beginPath(); c.moveTo(0, -s * 0.62); c.lineTo(s * 0.13, -s * 0.38); c.lineTo(s * 0.1, s * 0.2); c.lineTo(-s * 0.1, s * 0.2); c.lineTo(-s * 0.13, -s * 0.38); c.closePath(); c.fill();
     c.fillRect(-s * 0.28, s * 0.2, s * 0.56, s * 0.09); c.fillRect(-s * 0.06, s * 0.29, s * 0.12, s * 0.26); c.restore();
     // 技能键
-    const S = g.rules.xingli.skills, sb = this.skillBtns;
+    const S = g.skillsOf(p) as any[], sb = this.skillBtns, isX = p.sprite === 'xingli', hcol = g.heroDef(p.sprite)?.color ?? '#ffe9a8';
     for (let i = 0; i < 3; i++) {
-      const b = sb[i], cd = p.cds[i], active = this.aim?.i === i, lack = i === 2 && g.marks.length < 2;
+      const b = sb[i], cd = p.cds[i], active = this.aim?.i === i, lack = isX && i === 2 && g.marks.length < 2;
       c.save(); c.beginPath(); c.arc(b.x, b.y, b.r, 0, 7); c.clip();
       c.fillStyle = '#0f2a30'; c.fillRect(b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
-      const img = this.icons[i];
+      const img = isX ? this.icons[i] : null;
+      if (!isX && S[i]) { c.globalAlpha = cd > 0 || !p.alive ? 0.45 : 1; this.glyph(c, S[i].kind, b, hcol); c.globalAlpha = 1; }
       if (img && img.complete && img.naturalWidth) { c.globalAlpha = lack || cd > 0 || !p.alive ? 0.45 : 1; c.drawImage(img, b.x - b.r * 1.04, b.y - b.r * 1.04, b.r * 2.08, b.r * 2.08); c.globalAlpha = 1; }
       if (cd > 0) { c.fillStyle = 'rgba(6,16,20,.66)'; c.beginPath(); c.moveTo(b.x, b.y); c.arc(b.x, b.y, b.r * 1.2, -Math.PI / 2, -Math.PI / 2 + (cd / S[i].cooldownSeconds) * Math.PI * 2); c.closePath(); c.fill(); }
       c.restore();
       c.strokeStyle = active ? '#fff' : cd > 0 ? 'rgba(160,190,185,.6)' : 'rgba(255,233,168,.95)'; c.lineWidth = active ? 4 : 2.5;
       c.beginPath(); c.arc(b.x, b.y, b.r, 0, 7); c.stroke();
       if (cd > 0) { c.fillStyle = '#fff'; c.font = `700 ${Math.round(b.r * 0.8)}px ${FONT}`; c.fillText(cd < 1 ? cd.toFixed(1) : String(Math.ceil(cd)), b.x, b.y + 1); }
-      if (i === 2) for (let k = 0; k < 2; k++) { c.fillStyle = k < g.marks.length ? '#ffe9a8' : 'rgba(10,26,30,.85)'; c.strokeStyle = '#ffe9a8'; c.lineWidth = 1.5; c.beginPath(); c.arc(b.x + (k - 0.5) * b.r * 0.6, b.y - b.r * 1.22, b.r * 0.17, 0, 7); c.fill(); c.stroke(); }
+      if (isX && i === 2) for (let k = 0; k < 2; k++) { c.fillStyle = k < g.marks.length ? '#ffe9a8' : 'rgba(10,26,30,.85)'; c.strokeStyle = '#ffe9a8'; c.lineWidth = 1.5; c.beginPath(); c.arc(b.x + (k - 0.5) * b.r * 0.6, b.y - b.r * 1.22, b.r * 0.17, 0, 7); c.fill(); c.stroke(); }
     }
     // 取消区
     if (this.aim) {

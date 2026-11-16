@@ -45,7 +45,7 @@ with sync_playwright() as p:
     errors = []
     page.on('pageerror', lambda e: errors.append(str(e)))
     page.on('console', lambda m: errors.append(m.text) if m.type == 'error' else None)
-    page.goto(URL + ('?r=' + BACKEND if BACKEND else ''))
+    page.goto(URL + '?hero=xingli' + ('&r=' + BACKEND if BACKEND else ''))
     page.wait_for_function('window.__xq')
     ev = page.evaluate
     touch = Touch(ctx.new_cdp_session(page))

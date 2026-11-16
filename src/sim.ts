@@ -44,7 +44,15 @@ export interface Hero extends Base {
   path: Pt[] | null; pi: number; pgx: number; pgy: number; repath: number;
   cds: [number, number, number]; castT: number; kills: number; deaths: number;
   /** AI 已推进到的站位（兵线断档时不整段回撤） */ fwd: number;
+  /** 本英雄的普攻数值（rules.heroes[id].basicAttack，缺省用 heroDefaults） */ ba: { range: number; damage: number; interval: number };
+  /** 护盾（先于血量扣除）及其到期时间；加速、攻速增益 */ shield: number; shieldUntil: number; hasteUntil: number; hasteFrac: number; atkBuffUntil: number; atkBuffMul: number;
+  /** 突进中：方向、剩余距离、伤害、眩晕、已命中 */ dash: { dx: number; dy: number; left: number; damage: number; stun: number; hit: Set<number> } | null;
+  /** 眩晕中（rootUntil 之前不能移动也不能出手） */ stunned?: boolean;
 }
+/** 通用技能定义（assets/data/match-rules.json 的 heroes[id].skills）。kind：line 直线穿透 / ground-circle 落点范围 / cone 扇形 / dash 突进 / buff 增益 */
+export interface SkillDef { id: string; name: string; kind: 'line' | 'ground-circle' | 'cone' | 'dash' | 'buff' | 'triangle'; cooldownSeconds: number; range?: number; castRange?: number; width?: number; radius?: number; angleDeg?: number;
+  damage?: number; slowFraction?: number; slowSeconds?: number; stunSeconds?: number; healAllies?: number; shield?: number; allyShield?: number; heal?: number; allyHeal?: number; hasteFraction?: number; attackIntervalMultiplier?: number; seconds?: number }
+export interface HeroDef { name: string; role: string; color: string; blurb: string; hp?: number; basicAttack?: { range: number; damage: number; interval: number }; skills?: SkillDef[] }
 export interface Minion extends Base {
   kind: 'minion'; mkind: 'melee' | 'ranged'; lane: LaneId; speed: number; range: number; dmg: number; interval: number;
   atkCd: number; atkT: number; progress: number; target: Unit | null; moving: boolean;
@@ -57,16 +65,17 @@ export interface Core extends Base { kind: 'core' }
 export type Unit = Hero | Minion | Tower | Core;
 
 export interface Projectile { x: number; y: number; target: Unit; src: Unit; dmg: number; speed: number; style: 'hero' | 'minion' | 'tower'; team: Team }
-export interface Crescent { x: number; y: number; dx: number; dy: number; left: number; hit: Set<number>; src: Hero }
+export interface Crescent { x: number; y: number; dx: number; dy: number; left: number; hit: Set<number>; src: Hero; width: number; damage: number; /** crescent = 星璃的月牙贴图；bolt = 通用直线弹 */ style: 'crescent' | 'bolt'; slow?: [number, number] }
 export interface Mark { x: number; y: number; expire: number; born: number }
 export interface GameEvent { type: string; t: number; x: number; y: number; [k: string]: any }
-export interface CastResult { ok: boolean; reason?: 'dead' | 'cooldown' | 'marks' | 'range' | 'area' | 'over' }
+export interface CastResult { ok: boolean; reason?: 'dead' | 'cooldown' | 'marks' | 'range' | 'area' | 'over' | 'busy' | 'none' }
 
 // 角色 ID 与名字取自 xingque-runtime-assets 的 README；赤檐是新增的红方近战长枪手（首版仍共用普攻）
 const HERO_ROSTER: Record<Team, { sprite: string; name: string }[]> = {
   blue: [{ sprite: 'xingli', name: '星璃' }, { sprite: 'xuanyuan', name: '玄垣' }, { sprite: 'hedeng', name: '鹤灯' }],
   red: [{ sprite: 'yelan', name: '夜岚' }, { sprite: 'feixian', name: '绯弦' }, { sprite: 'chiyan', name: '赤檐' }],
 };
+export const HERO_IDS = ['xingli', 'xuanyuan', 'hedeng', 'yelan', 'feixian', 'chiyan'];
 const MINION_R = 6;
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -98,6 +107,8 @@ export class Game {
   private pending: { t: number; team: Team; lane: LaneId; kind: 'melee' | 'ranged' }[] = [];
   private occ: boolean[][] = [[], []];
   private navDirty = false;
+  /** 玩家操控的英雄 ID（改后调用 reset() 生效） */
+  playerHero = 'xingli';
   waves = 0;
 
   /** extra = 布景里会挡路的物件（assets/data/scenery.json 中 blockRadius>0 的岩石和树） */
@@ -138,13 +149,17 @@ export class Game {
       }
       const lanes: LaneId[] = team === 'blue' ? ['mid', ...rules.mode.blueBotLanes] : rules.mode.redBotLanes;
       const sp = map.teams[team].heroSpawn, hd = rules.heroDefaults;
-      HERO_ROSTER[team].forEach((def, i) => {
-        const spawn: Pt = [sp[0] + (i - 1) * 18, sp[1]];
+      // 玩家选的英雄坐蓝方中路的位置；被换下来的星璃去顶替那名英雄原来的位置（可能在红方）
+      const roster = { blue: HERO_ROSTER.blue.map((d) => ({ ...d })), red: HERO_ROSTER.red.map((d) => ({ ...d })) };
+      if (this.playerHero !== 'xingli') for (const tm of TEAMS) roster[tm].forEach((d, k) => { if (d.sprite === this.playerHero) { roster[tm][k] = roster.blue[0]; roster.blue[0] = d; } });
+      roster[team].forEach((def, i) => {
+        const spawn: Pt = [sp[0] + (i - 1) * 18, sp[1]], hdef = (rules as any).heroes?.[def.sprite] as HeroDef | undefined, hp = hdef?.hp ?? hd.hp;
         const h: Hero = {
-          ...base(team, spawn[0], spawn[1], hd.collisionRadius, hd.hp), kind: 'hero', sprite: def.sprite, name: def.name,
+          ...base(team, spawn[0], spawn[1], hd.collisionRadius, hp), kind: 'hero', sprite: def.sprite, name: def.name,
           isPlayer: team === 'blue' && i === 0, lane: lanes[i], speed: hd.moveSpeed, atkCd: 0, atkT: -9, windup: null,
           respawn: 0, spawn, ai: 'lane', moving: false, path: null, pi: 0, pgx: 0, pgy: 0, repath: 0,
           cds: [0, 0, 0], castT: -9, kills: 0, deaths: 0, fwd: 0,
+          ba: { ...(hdef?.basicAttack ?? hd.basicAttack) }, shield: 0, shieldUntil: 0, hasteUntil: 0, hasteFrac: 0, atkBuffUntil: 0, atkBuffMul: 1, dash: null,
         };
         this.heroes.push(h);
         if (h.isPlayer) this.player = h;
@@ -293,7 +308,7 @@ export class Game {
   private moveUnit(u: Hero | Minion, dx: number, dy: number, dt: number, maxDist = Infinity): void {
     const L = Math.hypot(dx, dy);
     if (L < 1e-6 || this.time < u.rootUntil) return;
-    const sp = u.speed * (this.time < u.slowUntil ? 1 - u.slowFrac : 1);
+    const sp = u.speed * (this.time < u.slowUntil ? 1 - u.slowFrac : 1) * (u.kind === 'hero' && this.time < u.hasteUntil ? 1 + u.hasteFrac : 1);
     const s = Math.min(sp * dt, maxDist);
     u.x += (dx / L) * s; u.y += (dy / L) * s; u.faceX = dx / L; u.faceY = dy / L; u.moving = true;
     this.resolve(u);
@@ -329,6 +344,10 @@ export class Game {
   // ---------------------------------------------------------------- 伤害
   damage(src: Unit | null, tgt: Unit, amount: number): void {
     if (!tgt.alive || this.over || !this.attackable(tgt)) return;
+    if (tgt.kind === 'hero' && tgt.shield > 0) {
+      if (this.time >= tgt.shieldUntil) tgt.shield = 0;
+      else { const ab = Math.min(tgt.shield, amount); tgt.shield -= ab; amount -= ab; }
+    }
     tgt.hp -= amount; tgt.hitT = this.time;
     if (tgt.kind === 'tower' || tgt.kind === 'core') this.events.push({ type: 'structHit', t: this.time, x: tgt.x, y: tgt.y, team: tgt.team });   // 只给音效/特效用
     if (src && src.kind === 'hero' && tgt.kind === 'hero')
@@ -360,7 +379,7 @@ export class Game {
       h.respawn -= dt;
       if (h.respawn <= 0) {
         h.alive = true; h.hp = h.maxHp; h.x = h.spawn[0]; h.y = h.spawn[1]; h.ai = 'lane'; h.atkCd = 0; h.fwd = 0;
-        h.slowUntil = h.rootUntil = h.revealUntil = 0; this.resolve(h);
+        h.slowUntil = h.rootUntil = h.revealUntil = 0; h.shield = 0; h.hasteUntil = h.atkBuffUntil = 0; h.dash = null; h.stunned = false; this.resolve(h);
         this.events.push({ type: 'respawn', t: this.time, x: h.x, y: h.y, team: h.team });
       }
       return;
@@ -371,27 +390,32 @@ export class Game {
     if (h.hp < h.maxHp && Math.hypot(h.x - sp[0], h.y - sp[1]) <= b.baseHealRadius) h.hp = Math.min(h.maxHp, h.hp + b.baseHealingHpPerSecond * dt);
     if (h.windup && (h.windup.t -= dt) <= 0) {
       const t = h.windup.target; h.windup = null;
-      const ba = this.rules.heroDefaults.basicAttack;
+      const ba = h.ba;
       if (t.alive && dist(h, t) - t.r <= ba.range + 30) {
-        this.projectiles.push({ x: h.x, y: h.y, target: t, src: h, dmg: ba.damage, speed: 300, style: 'hero', team: h.team });
+        if (ba.range <= 50) { this.damage(h, t, ba.damage); this.events.push({ type: 'hit', t: this.time, x: t.x, y: t.y }); }     // 近战：前摇结束直接结算
+        else this.projectiles.push({ x: h.x, y: h.y, target: t, src: h, dmg: ba.damage, speed: 300, style: 'hero', team: h.team });
         this.reveal(h); this.events.push({ type: 'shot', t: this.time, x: h.x, y: h.y, player: h.isPlayer });
       }
     }
     h.moving = false;
+    if (h.shield > 0 && this.time >= h.shieldUntil) h.shield = 0;
+    if (h.dash) { this.stepDash(h, dt); return; }
+    if (this.time >= h.rootUntil) h.stunned = false;
+    if (h.stunned) return;                                           // 眩晕：不能移动也不能出手
     if (h.isPlayer && !this.autopilot) this.controlPlayer(h, dt); else this.controlBot(h, dt);
   }
 
   /** 普攻：0.18s 前摇后在释放点生成弹体。 */
   private heroAttack(h: Hero, t: Unit): boolean {
     if (h.atkCd > 0 || h.windup) return false;
-    h.windup = { t: 0.18, target: t }; h.atkCd = this.rules.heroDefaults.basicAttack.interval; h.atkT = this.time;
+    h.windup = { t: 0.18, target: t }; h.atkCd = h.ba.interval * (this.time < h.atkBuffUntil ? h.atkBuffMul : 1); h.atkT = this.time;
     const d = dist(h, t) || 1; h.faceX = (t.x - h.x) / d; h.faceY = (t.y - h.y) / d;
     return true;
   }
 
   /** 星璃普攻选敌：射程内英雄优先，其次小兵，最后可攻击建筑。 */
   pickPlayerTarget(h: Hero = this.player, extra = 0): Unit | null {
-    const range = this.rules.heroDefaults.basicAttack.range + extra;
+    const range = h.ba.range + extra;
     const pick = (list: Unit[]): Unit | null => {
       let best: Unit | null = null, bd = Infinity;
       for (const u of list) {
@@ -435,7 +459,7 @@ export class Game {
   }
 
   private controlBot(h: Hero, dt: number): void {
-    const B = this.rules.bots, range = this.rules.heroDefaults.basicAttack.range;
+    const B = this.rules.bots, range = h.ba.range;
     const frac = h.hp / h.maxHp;
     if (h.ai === 'lane' && frac < B.retreatBelowHpFraction) h.ai = 'retreat';
     if (h.ai === 'retreat') {
@@ -509,7 +533,7 @@ export class Game {
     let L = Math.hypot(dx, dy);
     if (L < 1e-6) { dx = h.faceX; dy = h.faceY; L = Math.hypot(dx, dy) || 1; }
     dx /= L; dy /= L;
-    this.crescents.push({ x: h.x, y: h.y, dx, dy, left: s.range, hit: new Set(), src: h });
+    this.crescents.push({ x: h.x, y: h.y, dx, dy, left: s.range, hit: new Set(), src: h, width: s.width, damage: s.damage, style: 'crescent' });
     h.cds[0] = s.cooldownSeconds; h.castT = this.time; h.faceX = dx; h.faceY = dy; this.reveal(h);
     this.events.push({ type: 'cast', t: this.time, x: h.x, y: h.y, skill: 0 });
     return { ok: true };
@@ -559,15 +583,90 @@ export class Game {
     return { ok: true };
   }
 
+  /** 某英雄的三个技能定义。星璃沿用 rules.xingli.skills，其余读 rules.heroes[id].skills */
+  skillsOf(h: Hero = this.player): SkillDef[] { return h.sprite === 'xingli' ? (this.rules.xingli.skills as any) : ((this.rules as any).heroes?.[h.sprite]?.skills ?? []); }
+  heroDef(id: string): HeroDef | undefined { return (this.rules as any).heroes?.[id]; }
+
+  /** 通用技能出手（星璃以外的英雄）。(dx, dy) = 瞄准方向，(x, y) = 落点。按 kind 结算。 */
+  castSkill(i: number, aim: { x: number; y: number; dx: number; dy: number }, h: Hero = this.player): CastResult {
+    if (this.over) return { ok: false, reason: 'over' };
+    if (!h.alive) return { ok: false, reason: 'dead' };
+    if (h.cds[i] > 0) return { ok: false, reason: 'cooldown' };
+    if (h.dash || h.stunned) return { ok: false, reason: 'busy' };
+    const s = this.skillsOf(h)[i]; if (!s) return { ok: false, reason: 'none' };
+    let { dx, dy } = aim; let L = Math.hypot(dx, dy);
+    if (L < 1e-6) { dx = h.faceX; dy = h.faceY; L = Math.hypot(dx, dy) || 1; }
+    dx /= L; dy /= L;
+    const T = this.time, slow = s.slowFraction ? ([s.slowFraction, s.slowSeconds ?? 1] as [number, number]) : undefined;
+    const hitFx = (u: Unit) => {
+      u.revealUntil = T + 1.5;
+      if (slow) { u.slowUntil = T + slow[1]; u.slowFrac = slow[0]; }
+      if (s.stunSeconds && u.kind !== 'tower' && u.kind !== 'core') { u.rootUntil = T + s.stunSeconds; if (u.kind === 'hero') u.stunned = true; }
+      this.events.push({ type: 'hit', t: T, x: u.x, y: u.y });
+    };
+    if (s.kind === 'line') {
+      this.crescents.push({ x: h.x, y: h.y, dx, dy, left: s.range!, hit: new Set(), src: h, width: s.width ?? 20, damage: s.damage ?? 0, style: 'bolt', slow });
+      h.faceX = dx; h.faceY = dy;
+    } else if (s.kind === 'ground-circle') {
+      if (Math.hypot(aim.x - h.x, aim.y - h.y) > s.castRange! + 0.5) return { ok: false, reason: 'range' };
+      for (const u of this.enemiesOf(h.team)) if (Math.hypot(u.x - aim.x, u.y - aim.y) <= s.radius! + u.r * 0.5) { hitFx(u); this.damage(h, u, s.damage ?? 0); }
+      if (s.healAllies) for (const a of this.heroes) if (a.team === h.team && a.alive && Math.hypot(a.x - aim.x, a.y - aim.y) <= s.radius! + a.r) a.hp = Math.min(a.maxHp, a.hp + s.healAllies);
+      this.events.push({ type: 'beacon', t: T, x: aim.x, y: aim.y, r: s.radius! });
+    } else if (s.kind === 'cone') {
+      const half = ((s.angleDeg ?? 90) * Math.PI) / 360;
+      for (const u of this.enemiesOf(h.team)) {
+        const ux = u.x - h.x, uy = u.y - h.y, d = Math.hypot(ux, uy);
+        if (d - u.r > s.range!) continue;
+        if (d > 1e-3 && Math.acos(Math.max(-1, Math.min(1, (ux * dx + uy * dy) / d))) > half + Math.atan2(u.r, d)) continue;
+        hitFx(u); this.damage(h, u, s.damage ?? 0);
+      }
+      h.faceX = dx; h.faceY = dy;
+      this.events.push({ type: 'cone', t: T, x: h.x, y: h.y, dx, dy, r: s.range!, angle: half * 2 });
+    } else if (s.kind === 'dash') {
+      h.dash = { dx, dy, left: s.range!, damage: s.damage ?? 0, stun: s.stunSeconds ?? 0, hit: new Set() }; h.faceX = dx; h.faceY = dy; h.windup = null;
+      this.events.push({ type: 'dash', t: T, x: h.x, y: h.y, dx, dy, r: s.range! });
+    } else if (s.kind === 'buff') {
+      const dur = s.seconds ?? 3, area = (s.radius ?? 0) > 0;
+      const apply = (a: Hero, self: boolean) => {
+        const sh = self ? s.shield : s.allyShield, hl = self ? s.heal : s.allyHeal;
+        if (sh) { a.shield = Math.max(a.shield, sh); a.shieldUntil = T + dur; }
+        if (hl) a.hp = Math.min(a.maxHp, a.hp + hl);
+        if (s.hasteFraction && (self || area)) { a.hasteUntil = T + dur; a.hasteFrac = s.hasteFraction; }
+        if (self && s.attackIntervalMultiplier) { a.atkBuffUntil = T + dur; a.atkBuffMul = s.attackIntervalMultiplier; }
+      };
+      apply(h, true);
+      if (area) for (const a of this.heroes) if (a !== h && a.team === h.team && a.alive && dist(a, h) <= s.radius!) apply(a, false);
+      this.events.push({ type: 'buff', t: T, x: h.x, y: h.y, r: Math.max(18, s.radius ?? 0), secs: dur, who: h.id });
+    } else return { ok: false, reason: 'none' };
+    h.cds[i] = s.cooldownSeconds; h.castT = T; this.reveal(h);
+    this.events.push({ type: 'cast', t: T, x: h.x, y: h.y, skill: 0 });
+    return { ok: true };
+  }
+
+  /** 突进：高速直线位移（撞到障碍会被挡住），沿途每个敌人结算一次伤害（可带眩晕）。期间不接受移动和普攻。 */
+  private stepDash(h: Hero, dt: number): void {
+    const d = h.dash!, step = Math.min(460 * dt, d.left), px = h.x, py = h.y;
+    h.x += d.dx * step; h.y += d.dy * step; h.moving = true; this.resolve(h);
+    for (const u of this.enemiesOf(h.team)) {
+      if (d.hit.has(u.id) || dist(u, h) > h.r + u.r + 8) continue;
+      d.hit.add(u.id); u.revealUntil = this.time + 1.5;
+      if (d.stun) { u.rootUntil = this.time + d.stun; if (u.kind === 'hero') u.stunned = true; }
+      this.damage(h, u, d.damage); this.events.push({ type: 'hit', t: this.time, x: u.x, y: u.y });
+    }
+    d.left -= step;
+    if (d.left <= 0.01 || Math.hypot(h.x - px, h.y - py) < step * 0.35) h.dash = null;          // 走完或被挡住
+  }
+
   private updateCrescents(dt: number): void {
-    const s = this.rules.xingli.skills[0], speed = 430;
+    const speed = 430;
     for (const c of this.crescents) {
+      const s = c;
       const stepLen = Math.min(speed * dt, c.left), nx = c.x + c.dx * stepLen, ny = c.y + c.dy * stepLen;
       for (const u of this.enemiesOf(c.src.team)) {
         if (c.hit.has(u.id)) continue;
         const t = Math.max(0, Math.min(stepLen, (u.x - c.x) * c.dx + (u.y - c.y) * c.dy));
         if (Math.hypot(c.x + c.dx * t - u.x, c.y + c.dy * t - u.y) <= s.width / 2 + u.r) {
-          c.hit.add(u.id); u.revealUntil = this.time + 1.5; this.damage(c.src, u, s.damage);
+          c.hit.add(u.id); u.revealUntil = this.time + 1.5; if (c.slow) { u.slowUntil = this.time + c.slow[1]; u.slowFrac = c.slow[0]; } this.damage(c.src, u, s.damage);
           this.events.push({ type: 'hit', t: this.time, x: u.x, y: u.y });
         }
       }
