@@ -1,6 +1,6 @@
-# 交接说明：给六名英雄做各自独立的技能
+# 交接说明：给六名英雄设计各自独立的技能
 
-这份说明随工程包一起交给 Codex。工程当前是 v0.16，仓库 https://github.com/linyitao519-alt/xingque-canyon ，在线试玩 https://linyitao519-alt.github.io/xingque-canyon/ 。
+这份说明随工程包一起交给 Codex。分工：**Codex 负责设计技能、写给 Claude 的实现提示词、生成美术素材；代码由 Claude 来改。** 所以请不要改工程里的代码，下面的代码位置是给你写提示词时引用的。工程当前是 v0.16，仓库 https://github.com/linyitao519-alt/xingque-canyon ，在线试玩 https://linyitao519-alt.github.io/xingque-canyon/ 。
 
 ## 一、现状
 
@@ -71,10 +71,9 @@ python3 tools/build_single.py                # 重新生成单文件版
 - three.js 与 Canvas 两个渲染后端都要能用；单文件版要能生成。
 - `assets/data/map.json`。
 
-## 六、这一轮顺带要调的手感
+## 六、这一轮顺带要调的手感（写进给 Claude 的提示词里）
 
 - **移速**：英雄移速现在是 84（`match-rules.json` 的 `heroDefaults.moveSpeed`），要再慢一点点，建议 76–80。
 - **步频**：跑步动画的步子太碎。跑步帧带 6 帧是两步，帧的推进按走过的距离算：`src/render.ts` 的 `drawUpright()` 里 `a.phase += moved / (u.kind === 'hero' ? 33 : 17)`，
-  即英雄每走 33 世界单位播完一圈（两步）。移速 84 时是每秒 2.5 圈、5 步。请把英雄调到每秒约 1.6–1.8 圈（移速 78 时一圈约 44–48 单位），小兵按同样比例放慢（现在 17 单位一圈，移速 40）。
-  调完检查脚底有没有明显滑步，以及走走停停时跑步和待机之间的切换。
+  即英雄每走 33 世界单位播完一圈（两步）。移速 84 时是每秒 2.5 圈、5 步。目标是英雄每秒约 1.6–1.8 圈（移速 78 时一圈约 44–48 单位），小兵同比例放慢（现在 17 单位一圈，移速 40）。
 - **被动**：这一轮不加被动。
