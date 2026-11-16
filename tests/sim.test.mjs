@@ -141,33 +141,6 @@ test('塔优先打小兵；敌方英雄在塔下攻击己方英雄时立即转�
   assert.equal(tw.target, p);
 });
 
-test('星璃技能：弦月去而复返并留月痕，定星引爆月痕定身，星河阵持续结算后爆发', () => {
-  const g = mk(), p = g.player, [S0, S1, S2] = rules.xingli.skills;
-  p.x = 600; p.y = 700; g.update(1 / 30);
-  const a = dummy(g, 680, 700), far = dummy(g, 600 + S0.range + 40, 700);
-  // 弦月：去程全额，回程打折，射程外不命中；命中留下月痕
-  assert.ok(g.castCrescent(1, 0).ok); run(g, 0.25);
-  assert.equal(a.hp, 1000 - S0.damage, '去程命中'); assert.ok(a.moonUntil > g.time, '留下月痕');
-  run(g, 0.9);
-  assert.ok(Math.abs(a.hp - (1000 - S0.damage * (1 + S0.returnDamageFraction))) < 1e-6, `回程再命中一次（打折），实际 ${a.hp}`);
-  assert.equal(far.hp, 1000, '射程外不命中'); assert.equal(g.crescents.length, 0, '飞回后消失');
-  assert.ok(p.cds[0] > 0); assert.equal(g.castCrescent(1, 0).reason, 'cooldown');
-  // 定星：超射程取消且不进冷却；命中带月痕的目标 → 额外伤害 + 定身，月痕消耗
-  assert.equal(g.castBeacon(p.x + S1.castRange + 30, p.y).reason, 'range'); assert.equal(p.cds[1], 0);
-  let hp = a.hp; assert.ok(a.moonUntil > g.time);
-  assert.ok(g.castBeacon(680, 695).ok);
-  assert.ok(Math.abs(a.hp - (hp - S1.damage - S1.markBonusDamage)) < 1e-6, '引爆月痕的额外伤害'); assert.ok(a.rootUntil > g.time, '定身'); assert.equal(a.moonUntil, 0, '月痕消耗');
-  assert.ok(a.slowUntil > g.time && a.slowFrac === S1.slowFraction, '减速');
-  // 没有月痕时只有基础伤害、不定身
-  run(g, 2); p.cds[1] = 0; hp = a.hp; a.rootUntil = 0; assert.ok(g.castBeacon(680, 695).ok); assert.ok(Math.abs(a.hp - (hp - S1.damage)) < 1e-6); assert.equal(a.rootUntil, 0);
-  // 星河阵：超射程取消；持续期间每 tick 结算，结束时爆发并定身；阵外不受影响
-  assert.equal(g.castSkill(2, { x: p.x, y: p.y - S2.castRange - 20, dx: 0, dy: -1 }).reason, 'range'); assert.equal(p.cds[2], 0);
-  hp = a.hp; const hpFar = far.hp; a.rootUntil = 0;
-  assert.ok(g.castSkill(2, { x: 680, y: 700, dx: 1, dy: 0 }).ok); assert.equal(g.zones.length, 1); assert.equal(p.cds[2], S2.cooldownSeconds);
-  run(g, S2.tickSeconds * 2 + 0.1); assert.ok(Math.abs(a.hp - (hp - S2.tickDamage * 2)) < 1e-6, `两跳后 ${hp - a.hp}`); assert.ok(a.slowUntil > g.time && a.slowFrac === S2.slowFraction);
-  run(g, S2.seconds); const ticks = Math.round(S2.seconds / S2.tickSeconds);
-  assert.ok(Math.abs(a.hp - (hp - S2.tickDamage * ticks - S2.finalDamage)) < 1e-6, `总伤害 ${hp - a.hp}`); assert.equal(g.zones.length, 0); assert.equal(far.hp, hpFar, '阵外不受伤');
-});
 
 test('普攻选敌：英雄 > 小兵 > 可攻击建筑；按住普攻能打出伤害', () => {
   const g = mk(), p = g.player; p.x = 600; p.y = 700; g.update(1 / 30);
@@ -261,28 +234,6 @@ test('六名英雄：换人后玩家在蓝方中路，被换下的星璃顶替�
     assert.equal(g.player.ba.range, (d.basicAttack ?? rules.heroDefaults.basicAttack).range);
     assert.equal(g.skillsOf().length, 3);
   }
-});
-test('通用技能：直线、落点、扇形、突进、增益各自按规则结算并进入冷却', () => {
-  const mk = (id) => { const g = new Game(structuredClone(map), structuredClone(rules)); g.playerHero = id; g.reset(); const p = g.player; p.x = 600; p.y = 600;
-    const e = g.heroes.find((h) => h.team === 'red'); e.x = 630; e.y = 600; e.hp = e.maxHp = 1000; for (const h of g.heroes) if (h !== p && h !== e) { h.x = 100; h.y = 1100; } return { g, p, e }; };
-  for (const id of __IDS.filter((i) => i !== 'xingli')) {
-    rules.heroes[id].skills.forEach((s, i) => {
-      const { g, p, e } = mk(id); const hp0 = e.hp, php = (p.hp = p.maxHp - 150);
-      if (s.kind === 'ground-circle') { const r = g.castSkill(i, { x: e.x, y: e.y, dx: 1, dy: 0 }); assert.ok(r.ok); assert.equal(g.castSkill(i, { x: e.x, y: e.y, dx: 1, dy: 0 }).reason, 'cooldown'); }
-      else assert.ok(g.castSkill(i, { x: e.x, y: e.y, dx: 1, dy: 0 }).ok, `${id} ${s.name}`);
-      for (let k = 0; k < 30; k++) { e.x = Math.max(e.x, 615); g.update(1 / 60); }
-      assert.equal(p.cds[i] > 0, true, `${id} ${s.name} 进入冷却`);
-      if (s.damage) assert.ok(e.hp <= hp0 - s.damage + 1e-6, `${id} ${s.name} 造成伤害 ${hp0 - e.hp}`);
-      if (s.kind === 'dash') assert.ok(p.x > 615 && !p.dash, `${id} ${s.name} 位移到 ${p.x.toFixed(0)}`);
-      if (s.shield) assert.ok(p.shield > 0);
-      if (s.heal) assert.ok(p.hp > php);
-      if (s.attackIntervalMultiplier) assert.ok(g.time < p.atkBuffUntil);
-    });
-  }
-  // 护盾先扣
-  const { g, p, e } = mk('xuanyuan'); g.castSkill(2, { x: p.x, y: p.y, dx: 1, dy: 0 }); const hp = p.hp; g.damage(e, p, 100); assert.equal(p.hp, hp); assert.equal(p.shield, 60);
-  // 眩晕期间不能出手
-  const a = mk('chiyan'); a.g.castSkill(2, { x: a.e.x, y: a.e.y, dx: 1, dy: 0 }); for (let k = 0; k < 12; k++) a.g.update(1 / 60); assert.ok(a.e.stunned, '被破阵眩晕');
 });
 test('六名英雄各自托管打一局：都能跑到结算，不报错', () => {
   for (const id of __IDS) {

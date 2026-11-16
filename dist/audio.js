@@ -1,4 +1,7 @@
-const FILES = ['attack-cast', 'attack-hit', 'beacon-placed', 'constellation-close', 'tower-hit', 'tower-destroyed', 'victory', 'defeat'];
+const BASE = ['attack-cast', 'attack-hit', 'tower-hit', 'tower-destroyed', 'victory', 'defeat'];
+/** 18 个技能的出手音：sfx-<英雄>-<技能>.wav，一次成功施法（一个 castId）只响一次 */
+export const SKILL_SFX = { xingli: ['crescent', 'beacon', 'starfield'], xuanyuan: ['guard', 'ram', 'ward'], hedeng: ['perch', 'thread', 'recall'], yelan: ['veil', 'backstep', 'reap'], feixian: ['draw', 'snare', 'stance'], chiyan: ['hook', 'sweep', 'ring'] };
+const FILES = [...BASE, ...Object.entries(SKILL_SFX).flatMap(([h, ids]) => ids.map((id) => `sfx-${h}-${id}`))];
 export class Sfx {
     game;
     base;
@@ -9,6 +12,7 @@ export class Sfx {
     log = [];
     ctx = null;
     buf = {};
+    played = new Set();
     lastT = -1;
     lastHit = -9;
     lastStruct = -9;
@@ -59,6 +63,7 @@ export class Sfx {
         const g = this.game, p = g.player;
         if (g.time < this.lastT) {
             this.lastT = -1;
+            this.played.clear();
             this.lastHit = this.lastStruct = this.lastShot = -9;
         } // 重开
         let maxT = this.lastT;
@@ -77,38 +82,25 @@ export class Sfx {
                     }
                     break;
                 case 'cast':
-                    if (e.skill === 0)
-                        this.play('attack-cast', 0.9, 0.72);
-                    break; // 弦月出手：同一音效降调
+                    if (e.castId != null && !this.played.has(e.castId)) {
+                        this.played.add(e.castId);
+                        this.play(`sfx-${e.heroId}-${e.skillId}`, e.casterId === p.id ? 1 : 0.75 * near);
+                    }
+                    break;
                 case 'hit':
                     if (e.t - this.lastHit > 0.07) {
                         this.lastHit = e.t;
                         this.play('attack-hit', 0.55 * near);
                     }
                     break;
-                case 'beacon':
-                    this.play('beacon-placed', 0.9);
-                    break;
-                case 'triangle':
-                    this.play('constellation-close', 1);
-                    break;
-                case 'cone':
-                    this.play('attack-hit', 0.75 * near, 0.8);
-                    break;
-                case 'dash':
-                    this.play('attack-cast', 0.8 * near, 1.25);
-                    break;
-                case 'buff':
-                    this.play('beacon-placed', 0.7 * near, 1.2);
-                    break;
-                case 'zone':
-                    this.play('beacon-placed', 1 * near, 0.75);
-                    break;
-                case 'zoneEnd':
-                    this.play('constellation-close', 1 * near);
-                    break;
                 case 'detonate':
-                    this.play('attack-hit', 0.9 * near, 1.3);
+                case 'trapHit':
+                case 'wallHit':
+                case 'ringHit':
+                    if (e.t - this.lastHit > 0.07) {
+                        this.lastHit = e.t;
+                        this.play('attack-hit', 0.8 * near, 1.25);
+                    }
                     break;
                 case 'structHit':
                     if (e.t - this.lastStruct > 0.16) {

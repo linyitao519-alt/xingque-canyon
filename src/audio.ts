@@ -2,7 +2,10 @@
 // 浏览器要求先有一次用户手势才能出声：首次触控/按键时创建并恢复 AudioContext，再解码音频。
 import type { Game } from './sim.js';
 
-const FILES = ['attack-cast', 'attack-hit', 'beacon-placed', 'constellation-close', 'tower-hit', 'tower-destroyed', 'victory', 'defeat'];
+const BASE = ['attack-cast', 'attack-hit', 'tower-hit', 'tower-destroyed', 'victory', 'defeat'];
+/** 18 个技能的出手音：sfx-<英雄>-<技能>.wav，一次成功施法（一个 castId）只响一次 */
+export const SKILL_SFX: Record<string, string[]> = { xingli: ['crescent', 'beacon', 'starfield'], xuanyuan: ['guard', 'ram', 'ward'], hedeng: ['perch', 'thread', 'recall'], yelan: ['veil', 'backstep', 'reap'], feixian: ['draw', 'snare', 'stance'], chiyan: ['hook', 'sweep', 'ring'] };
+const FILES = [...BASE, ...Object.entries(SKILL_SFX).flatMap(([h, ids]) => ids.map((id) => `sfx-${h}-${id}`))];
 
 export class Sfx {
   muted = false;
@@ -12,6 +15,7 @@ export class Sfx {
   log: { t: number; name: string; vol: number; rate: number }[] = [];
   ctx: AudioContext | null = null;
   private buf: Record<string, AudioBuffer> = {};
+  private played = new Set<number>();
   private lastT = -1; private lastHit = -9; private lastStruct = -9; private lastShot = -9;
 
   constructor(private game: Game, private base = 'assets/audio/') {
@@ -48,7 +52,7 @@ export class Sfx {
   /** 每帧调用：处理上次之后新产生的事件。离星璃越远音量越小，300 单位外不响。 */
   update(): void {
     const g = this.game, p = g.player;
-    if (g.time < this.lastT) { this.lastT = -1; this.lastHit = this.lastStruct = this.lastShot = -9; }      // 重开
+    if (g.time < this.lastT) { this.lastT = -1; this.played.clear(); this.lastHit = this.lastStruct = this.lastShot = -9; }      // 重开
     let maxT = this.lastT;
     for (const e of g.events) {
       if (e.t <= this.lastT) continue;
@@ -56,16 +60,9 @@ export class Sfx {
       const near = e.type === 'end' ? 1 : Math.max(0, 1 - Math.hypot(e.x - p.x, e.y - p.y) / 300);
       switch (e.type) {
         case 'shot': if (e.player) this.play('attack-cast', 0.75); else if (e.t - this.lastShot > 0.12) { this.lastShot = e.t; this.play('attack-cast', 0.3 * near, 0.85); } break;
-        case 'cast': if (e.skill === 0) this.play('attack-cast', 0.9, 0.72); break;                           // 弦月出手：同一音效降调
+        case 'cast': if (e.castId != null && !this.played.has(e.castId)) { this.played.add(e.castId); this.play(`sfx-${e.heroId}-${e.skillId}`, e.casterId === p.id ? 1 : 0.75 * near); } break;
         case 'hit': if (e.t - this.lastHit > 0.07) { this.lastHit = e.t; this.play('attack-hit', 0.55 * near); } break;
-        case 'beacon': this.play('beacon-placed', 0.9); break;
-        case 'triangle': this.play('constellation-close', 1); break;
-        case 'cone': this.play('attack-hit', 0.75 * near, 0.8); break;
-        case 'dash': this.play('attack-cast', 0.8 * near, 1.25); break;
-        case 'buff': this.play('beacon-placed', 0.7 * near, 1.2); break;
-        case 'zone': this.play('beacon-placed', 1 * near, 0.75); break;
-        case 'zoneEnd': this.play('constellation-close', 1 * near); break;
-        case 'detonate': this.play('attack-hit', 0.9 * near, 1.3); break;
+        case 'detonate': case 'trapHit': case 'wallHit': case 'ringHit': if (e.t - this.lastHit > 0.07) { this.lastHit = e.t; this.play('attack-hit', 0.8 * near, 1.25); } break;
         case 'structHit': if (e.t - this.lastStruct > 0.16) { this.lastStruct = e.t; this.play('tower-hit', 0.6 * near); } break;
         case 'towerDown': this.play('tower-destroyed', 0.4 + 0.6 * near); break;
         case 'coreDown': this.play('tower-destroyed', 1, 0.8); break;

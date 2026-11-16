@@ -53,7 +53,7 @@
   },
   "heroDefaults": {
     "hp": 420,
-    "moveSpeed": 84,
+    "moveSpeed": 78,
     "collisionRadius": 10,
     "respawnSeconds": 8,
     "basicAttack": {
@@ -69,49 +69,6 @@
     "baseHealRadius": 56,
     "chaseMaxDistance": 100,
     "avoidEnemyTowerUnlessAlliedMinionInRange": true
-  },
-  "xingli": {
-    "skills": [
-      {
-        "id": "crescent",
-        "name": "弦月",
-        "kind": "line",
-        "range": 165,
-        "width": 26,
-        "damage": 70,
-        "returns": true,
-        "returnDamageFraction": 0.6,
-        "markSeconds": 4,
-        "cooldownSeconds": 4.5
-      },
-      {
-        "id": "beacon",
-        "name": "定星",
-        "kind": "ground-circle",
-        "castRange": 140,
-        "radius": 42,
-        "damage": 55,
-        "slowFraction": 0.35,
-        "slowSeconds": 1.5,
-        "markBonusDamage": 45,
-        "markRootSeconds": 0.8,
-        "cooldownSeconds": 5
-      },
-      {
-        "id": "starfield",
-        "name": "星河阵",
-        "kind": "zone",
-        "castRange": 150,
-        "radius": 66,
-        "seconds": 3,
-        "tickSeconds": 0.5,
-        "tickDamage": 28,
-        "slowFraction": 0.4,
-        "finalDamage": 70,
-        "finalRootSeconds": 0.7,
-        "cooldownSeconds": 24
-      }
-    ]
   },
   "jungle": {
     "smallCamp": {
@@ -139,7 +96,59 @@
       "name": "星璃",
       "role": "法师 · 远程",
       "color": "#b48cff",
-      "blurb": "弦月去而复返并留下月痕，定星引爆月痕定身，星河阵持续轰炸"
+      "blurb": "弦月去而复返留月痕，定星引爆月痕定身，星河阵持续轰炸并补月痕",
+      "skills": [
+        {
+          "id": "crescent",
+          "name": "弦月",
+          "kind": "line",
+          "aim": "direction",
+          "cooldownSeconds": 4.5,
+          "windupSeconds": 0.12,
+          "range": 165,
+          "width": 26,
+          "damage": 70,
+          "returns": true,
+          "returnDamageFraction": 0.6,
+          "markSeconds": 4,
+          "speed": 430,
+          "returnSpeed": 490,
+          "returnMaxSeconds": 0.85
+        },
+        {
+          "id": "beacon",
+          "name": "定星",
+          "kind": "ground-circle",
+          "aim": "ground",
+          "cooldownSeconds": 5,
+          "windupSeconds": 0.18,
+          "castRange": 140,
+          "radius": 42,
+          "damage": 55,
+          "slowFraction": 0.35,
+          "slowSeconds": 1.5,
+          "markBonusDamage": 45,
+          "markRootSeconds": 0.8
+        },
+        {
+          "id": "starfield",
+          "name": "星河阵",
+          "kind": "zone",
+          "aim": "ground",
+          "cooldownSeconds": 24,
+          "windupSeconds": 0.25,
+          "castRange": 150,
+          "radius": 66,
+          "seconds": 3,
+          "tickSeconds": 0.5,
+          "tickDamage": 23,
+          "slowFraction": 0.4,
+          "slowSeconds": 0.65,
+          "finalDamage": 62,
+          "finalRootSeconds": 0.7,
+          "markSeconds": 4
+        }
+      ]
     },
     "xuanyuan": {
       "name": "玄垣",
@@ -151,37 +160,53 @@
         "damage": 38,
         "interval": 0.9
       },
-      "blurb": "盾击减速，冲阵眩晕，垣壁给全队护盾",
+      "blurb": "举盾挡正面伤害，盾撞把人顶到墙上，护阵替队友承伤",
       "skills": [
         {
-          "id": "bash",
-          "name": "盾击",
-          "kind": "cone",
-          "range": 46,
-          "angleDeg": 100,
-          "damage": 55,
-          "slowFraction": 0.35,
-          "slowSeconds": 1.2,
-          "cooldownSeconds": 4
-        },
-        {
-          "id": "charge",
-          "name": "冲阵",
-          "kind": "dash",
-          "range": 95,
-          "damage": 45,
-          "stunSeconds": 0.6,
-          "cooldownSeconds": 8
-        },
-        {
-          "id": "bulwark",
-          "name": "垣壁",
+          "id": "guard",
+          "name": "举盾",
           "kind": "buff",
-          "radius": 70,
-          "shield": 160,
-          "allyShield": 80,
-          "seconds": 4,
-          "cooldownSeconds": 20
+          "aim": "direction",
+          "cooldownSeconds": 8,
+          "windupSeconds": 0.08,
+          "angleDeg": 120,
+          "seconds": 2.4,
+          "blockFraction": 0.65,
+          "guardBudget": 135,
+          "selfSlowFraction": 0.24,
+          "guardChargeThreshold": 45
+        },
+        {
+          "id": "ram",
+          "name": "盾撞",
+          "kind": "dash",
+          "aim": "direction",
+          "cooldownSeconds": 8,
+          "windupSeconds": 0.14,
+          "range": 76,
+          "width": 30,
+          "speed": 300,
+          "damage": 44,
+          "pushDistance": 42,
+          "pushSpeed": 230,
+          "wallDamage": 34,
+          "stunSeconds": 0.7,
+          "guardBonusPush": 18
+        },
+        {
+          "id": "ward",
+          "name": "护阵",
+          "kind": "buff",
+          "aim": "ground",
+          "cooldownSeconds": 22,
+          "windupSeconds": 0.18,
+          "castRange": 108,
+          "snapRadius": 32,
+          "seconds": 3.5,
+          "breakRange": 132,
+          "redirectFraction": 0.45,
+          "redirectBudget": 105,
+          "shield": 72
         }
       ]
     },
@@ -195,39 +220,48 @@
         "damage": 30,
         "interval": 0.8
       },
-      "blurb": "引灯消耗，灯域减速并治疗，鹤归群体回复",
+      "blurb": "落灯照亮草丛并回血，鹤引连线加速，归鹤沿路治疗",
       "skills": [
         {
-          "id": "lantern",
-          "name": "引灯",
-          "kind": "line",
-          "range": 150,
-          "width": 20,
-          "damage": 60,
-          "cooldownSeconds": 4
+          "id": "perch",
+          "name": "落灯",
+          "kind": "zone",
+          "aim": "ground",
+          "cooldownSeconds": 9,
+          "windupSeconds": 0.18,
+          "castRange": 132,
+          "radius": 45,
+          "seconds": 6,
+          "tickSeconds": 1,
+          "healAllies": 13
         },
         {
-          "id": "glow",
-          "name": "灯域",
-          "kind": "ground-circle",
-          "castRange": 135,
-          "radius": 44,
-          "damage": 30,
-          "slowFraction": 0.35,
-          "slowSeconds": 1.5,
-          "healAllies": 50,
-          "cooldownSeconds": 7
-        },
-        {
-          "id": "return",
-          "name": "鹤归",
+          "id": "thread",
+          "name": "鹤引",
           "kind": "buff",
-          "radius": 90,
-          "heal": 110,
-          "allyHeal": 110,
-          "hasteFraction": 0.2,
-          "seconds": 3,
-          "cooldownSeconds": 22
+          "aim": "ground",
+          "cooldownSeconds": 8,
+          "windupSeconds": 0.12,
+          "castRange": 112,
+          "snapRadius": 34,
+          "seconds": 4,
+          "breakRange": 138,
+          "healRouteLength": 190,
+          "hasteFraction": 0.14
+        },
+        {
+          "id": "recall",
+          "name": "归鹤",
+          "kind": "line",
+          "aim": "tap",
+          "cooldownSeconds": 22,
+          "windupSeconds": 0.15,
+          "range": 190,
+          "width": 42,
+          "speed": 320,
+          "heal": 72,
+          "shield": 35,
+          "shieldSeconds": 2
         }
       ]
     },
@@ -241,34 +275,49 @@
         "damage": 44,
         "interval": 0.7
       },
-      "blurb": "影袭突进，爪刃横扫，夜幕加速并提攻速",
+      "blurb": "匿影潜行，狐步闪到身后，断月收割并刷新技能",
       "skills": [
         {
-          "id": "pounce",
-          "name": "影袭",
-          "kind": "dash",
-          "range": 110,
-          "damage": 70,
-          "cooldownSeconds": 6
-        },
-        {
-          "id": "claws",
-          "name": "爪刃",
-          "kind": "cone",
-          "range": 42,
-          "angleDeg": 120,
-          "damage": 60,
-          "cooldownSeconds": 3
-        },
-        {
-          "id": "nightfall",
-          "name": "夜幕",
+          "id": "veil",
+          "name": "匿影",
           "kind": "buff",
-          "radius": 0,
-          "hasteFraction": 0.35,
-          "attackIntervalMultiplier": 0.6,
-          "seconds": 4,
-          "cooldownSeconds": 20
+          "aim": "tap",
+          "cooldownSeconds": 11,
+          "windupSeconds": 0.1,
+          "seconds": 2.5,
+          "hasteFraction": 0.16,
+          "proximityReveal": 32,
+          "postRevealSeconds": 0.35
+        },
+        {
+          "id": "backstep",
+          "name": "狐步",
+          "kind": "dash",
+          "aim": "ground",
+          "cooldownSeconds": 8,
+          "windupSeconds": 0.14,
+          "castRange": 94,
+          "snapRadius": 32,
+          "behindDistance": 21,
+          "damage": 48,
+          "hiddenBonusDamage": 22,
+          "markSeconds": 3
+        },
+        {
+          "id": "reap",
+          "name": "断月",
+          "kind": "cone",
+          "aim": "direction",
+          "cooldownSeconds": 20,
+          "windupSeconds": 0.2,
+          "range": 49,
+          "angleDeg": 105,
+          "damage": 76,
+          "executeThreshold": 0.28,
+          "executeBonusDamage": 52,
+          "markBonusDamage": 12,
+          "refreshWindowSeconds": 1.2,
+          "veilCooldownReduction": 4
         }
       ]
     },
@@ -282,37 +331,56 @@
         "damage": 36,
         "interval": 0.75
       },
-      "blurb": "穿云箭超远，箭雨范围减速，疾弦提攻速",
+      "blurb": "满弦蓄力远射，伏矢设陷阱定身，鹰眼拉长普攻",
       "skills": [
         {
-          "id": "pierce",
-          "name": "穿云箭",
+          "id": "draw",
+          "name": "满弦",
           "kind": "line",
-          "range": 185,
-          "width": 16,
-          "damage": 80,
-          "cooldownSeconds": 5
+          "aim": "charge",
+          "cooldownSeconds": 7,
+          "windupSeconds": 0.09,
+          "range": 182,
+          "minRange": 105,
+          "width": 19,
+          "minDamage": 48,
+          "damage": 100,
+          "speed": 520,
+          "maxChargeSeconds": 1.15,
+          "chargeMoveMultiplier": 0.66,
+          "secondaryDamageMultiplier": 0.65,
+          "markBonusDamage": 23
         },
         {
-          "id": "volley",
-          "name": "箭雨",
+          "id": "snare",
+          "name": "伏矢",
           "kind": "ground-circle",
-          "castRange": 150,
-          "radius": 42,
-          "damage": 60,
-          "slowFraction": 0.25,
-          "slowSeconds": 1,
-          "cooldownSeconds": 7
+          "aim": "ground",
+          "cooldownSeconds": 9,
+          "windupSeconds": 0.16,
+          "castRange": 123,
+          "radius": 25,
+          "armingSeconds": 0.45,
+          "seconds": 10,
+          "maxObjects": 2,
+          "damage": 25,
+          "rootSeconds": 0.85,
+          "markSeconds": 3,
+          "revealSeconds": 3
         },
         {
-          "id": "quickstring",
-          "name": "疾弦",
+          "id": "stance",
+          "name": "鹰眼",
           "kind": "buff",
-          "radius": 0,
-          "hasteFraction": 0.2,
-          "attackIntervalMultiplier": 0.55,
-          "seconds": 4,
-          "cooldownSeconds": 18
+          "aim": "tap",
+          "cooldownSeconds": 20,
+          "windupSeconds": 0.12,
+          "seconds": 5,
+          "bonusAttackRange": 35,
+          "farThreshold": 108,
+          "farAttackBonus": 11,
+          "selfSlowFraction": 0.3,
+          "chargeTimeMultiplier": 0.72
         }
       ]
     },
@@ -326,36 +394,53 @@
         "damage": 40,
         "interval": 0.85
       },
-      "blurb": "突刺直线，横扫减速，破阵长距离突进眩晕",
+      "blurb": "回钩拉人，拒阵击退，枪围跃击圈地",
       "skills": [
         {
-          "id": "thrust",
-          "name": "突刺",
+          "id": "hook",
+          "name": "回钩",
           "kind": "line",
-          "range": 72,
-          "width": 16,
-          "damage": 65,
-          "cooldownSeconds": 3.5
+          "aim": "direction",
+          "cooldownSeconds": 6,
+          "windupSeconds": 0.17,
+          "range": 83,
+          "width": 22,
+          "damage": 47,
+          "pullDistance": 43,
+          "pullSpeed": 240,
+          "minSeparation": 29,
+          "slowFraction": 0.2,
+          "slowSeconds": 0.7
         },
         {
           "id": "sweep",
-          "name": "横扫",
+          "name": "拒阵",
           "kind": "cone",
-          "range": 52,
-          "angleDeg": 150,
-          "damage": 55,
-          "slowFraction": 0.3,
-          "slowSeconds": 1,
-          "cooldownSeconds": 6
+          "aim": "direction",
+          "cooldownSeconds": 8,
+          "windupSeconds": 0.2,
+          "range": 61,
+          "angleDeg": 135,
+          "damage": 52,
+          "pushDistance": 40,
+          "pushSpeed": 215
         },
         {
-          "id": "breach",
-          "name": "破阵",
-          "kind": "dash",
-          "range": 120,
-          "damage": 90,
-          "stunSeconds": 0.7,
-          "cooldownSeconds": 18
+          "id": "ring",
+          "name": "枪围",
+          "kind": "zone",
+          "aim": "ground",
+          "cooldownSeconds": 23,
+          "windupSeconds": 0.22,
+          "castRange": 99,
+          "radius": 60,
+          "seconds": 4,
+          "damage": 68,
+          "width": 17,
+          "entryDamage": 26,
+          "slowFraction": 0.38,
+          "slowSeconds": 1.05,
+          "leapSpeed": 325
         }
       ]
     }

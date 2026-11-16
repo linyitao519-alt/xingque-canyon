@@ -23,13 +23,14 @@ async function boot() {
                     t.position = lay.mid[t.id];
     }
     // 图标顺序：弦月、定星、三星结界
-    const icons = ['crescent', 'beacon', 'constellation'].map((n) => { const i = new Image(); i.src = `assets/icons/${n}.png`; return i; });
+    const icons = []; // 技能图标改为按 icon-<英雄>-<技能>.png 由 HUD 自己加载
     // 运行时素材（英雄、小兵、建筑、地形、地表贴图）；?art=0 可切回代码占位
     const q = new URLSearchParams(location.search);
     const art = q.get('art') === '0' ? { loaded: [], tiles: {} } : await loadArt();
     // 布景里会挡路的岩石和树进入同一套碰撞与寻路
     const game = new Game(map, rules, scenery.props.filter((p) => p.blockRadius > 0).map((p) => ({ x: p.pos[0], y: p.pos[1], r: p.blockRadius })));
     game.autopilot = q.get('auto') === '1';
+    game.aiSkills = q.get('aiskills') === '1'; // AI 也用技能：默认关，?aiskills=1 打开（托管和平衡跑批用）
     // 玩家英雄：?hero=<id> 直接指定；否则开局弹出选择面板（暂停和自动对战模式下默认星璃，不弹）
     const heroIds = ['xingli', 'xuanyuan', 'hedeng', 'yelan', 'feixian', 'chiyan'].filter((id) => rules.heroes?.[id]);
     const heroQ = q.get('hero') ?? '';
@@ -171,7 +172,7 @@ async function boot() {
             role.textContent = d.role;
             card.appendChild(role);
             const sk = document.createElement('span');
-            sk.textContent = (id === 'xingli' ? rules.xingli.skills : d.skills).map((s) => s.name).join(' · ');
+            sk.textContent = d.skills.map((s) => s.name).join(' · ');
             card.appendChild(sk);
             const bl = document.createElement('em');
             bl.textContent = d.blurb;

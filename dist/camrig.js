@@ -53,7 +53,7 @@ export class CamRig {
         if (this.opts.aimCam && aim && p.alive && Math.hypot(aim.ax, aim.ay) >= 0.18) {
             // 技能瞄准：用 aimWorld() 的落点决定取景方向。上限 = 玩家自己仍留在安全框内（留 44px）
             const w = this.hud.aimWorld(aim), r = this.hud.safeRect(), [px, py] = c.toScreenAt(p.x, p.y, c.fx, c.fy), vz = c.z * Camera.KY, m = 44;
-            const [dx, dy] = this.need(w.x, w.y, aim.i === 1 ? g.rules.xingli.skills[1].radius * c.z * 0.6 : 10);
+            const [dx, dy] = this.need(w.x, w.y, (g.skillsOf(g.player)[aim.i]?.radius ?? 16) * c.z * 0.6);
             tx = Math.max(-(r[2] - m - px) / c.z, Math.min((px - r[0] - m) / c.z, dx));
             ty = Math.max(-(r[3] - m - py) / vz, Math.min((py - r[1] - m) / vz, dy));
             // 减幅档（?aimcam=1）：偏移上限 横 24px / 纵 18px，够提示方向，不把画面甩出去；?aimcam=full 是 v11 的完整取景

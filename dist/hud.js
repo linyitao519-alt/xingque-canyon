@@ -1,10 +1,11 @@
 // 触控与 HUD：左摇杆、右侧普攻 + 三技能（按住拖动瞄准，松手施放，拖到取消区放弃）、
 // 小地图、计时比分、复活倒计时、结算与重开。所有控件都用 Pointer Events 按 pointerId 独立跟踪，
 // 所以移动和瞄准可以同时进行。
+import * as Skills from './skills.js';
 import { LANES, TEAMS } from './sim.js';
 import { TEAM } from './sprites.js';
 const FONT = 'system-ui,"PingFang SC","Microsoft YaHei",sans-serif';
-const REASON = { busy: '', none: '', cooldown: '技能冷却中', marks: '需要两枚星标', area: '结界面积不足', range: '超出施法距离', dead: '', over: '' };
+const REASON = { busy: '', none: '', cooldown: '技能冷却中', range: '超出施法距离', target: '附近没有可选的目标', spot: '这里放不下', rooted: '被定身，无法位移', dead: '', over: '' };
 export class Hud {
     canvas;
     game;
@@ -18,6 +19,9 @@ export class Hud {
     atkId = -1;
     aim = null;
     aimId = -1;
+    keyCharge = -1;
+    failT = -1;
+    aimMode(i) { return this.game.skillsOf(this.game.player)[i]?.aim ?? 'direction'; }
     keys = new Set();
     toast = { text: '', until: 0 };
     /** 调试/验收用：最近一次施法结果 */
@@ -40,12 +44,23 @@ export class Hud {
             if (e.repeat)
                 return;
             this.keys.add(k);
-            if (k === '1' || k === '2' || k === '3')
-                this.release({ i: +k - 1, ax: 0, ay: 0, cancel: false });
+            if (k === '1' || k === '2' || k === '3') {
+                const i = +k - 1;
+                if (this.aimMode(i) === 'charge') {
+                    if (this.game.beginCharge(i).ok)
+                        this.keyCharge = i;
+                }
+                else
+                    this.release({ i, ax: 0, ay: 0, cancel: false });
+            }
             if (k === 'r' && this.game.over)
                 this.onRestart();
         });
-        addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()));
+        addEventListener('keyup', (e) => { const k = e.key.toLowerCase(); this.keys.delete(k); if (this.keyCharge >= 0 && k === String(this.keyCharge + 1)) {
+            const i = this.keyCharge;
+            this.keyCharge = -1;
+            this.release({ i, ax: 0, ay: 0, cancel: false, charge: true });
+        } });
         addEventListener('blur', () => { this.keys.clear(); this.resetTouches(); });
     }
     /** env = 系统上报的安全区内边距。再加一圈保底边距，保证没有刘海的机型上按钮也不贴边。 */
@@ -78,7 +93,8 @@ export class Hud {
         return { minimap: [m.x, m.y, m.x + m.s, m.y + m.s], joystick: circ(this.joyHome), attack: circ(this.atkBtn), skill1: circ(sb[0]), skill2: circ(sb[1]),
             skill3: [pip.x - pip.r, pip.y - pip.r * 1.42, pip.x + pip.r, pip.y + pip.r], cancel: circ(this.cancelBtn), fullscreen: circ(this.fsBtn), mute: circ(this.muteBtn) };
     }
-    resetTouches() { this.joy.id = -1; this.atkId = -1; this.aimId = -1; this.aim = null; }
+    resetTouches() { if (this.aim?.charge || this.keyCharge >= 0)
+        this.game.cancelCharge(); this.keyCharge = -1; this.joy.id = -1; this.atkId = -1; this.aimId = -1; this.aim = null; }
     // ------------------------------------------------------------------ 布局（比例取自镜头参考稿）
     get R() { return this.W - this.safe.r; }
     get B() { return this.H - this.safe.b; }
@@ -132,8 +148,16 @@ export class Hud {
         const sb = this.skillBtns;
         for (let i = 0; i < 3; i++)
             if (this.aimId < 0 && this.hit(sb[i], x, y)) {
+                const charge = this.aimMode(i) === 'charge';
+                if (charge) {
+                    const res = this.game.beginCharge(i);
+                    if (!res.ok) {
+                        this.fail(i, res.reason);
+                        return;
+                    }
+                } // 蓄力：按下就开始攒，松手出手
                 this.aimId = e.pointerId;
-                this.aim = { i, ax: 0, ay: 0, cancel: false };
+                this.aim = { i, ax: 0, ay: 0, cancel: false, charge };
                 return;
             }
         if (this.atkId < 0 && this.hit(this.atkBtn, x, y)) {
@@ -191,19 +215,26 @@ export class Hud {
             this.aim = null;
             if (a && !cancelled && !a.cancel)
                 this.release(a);
+            else if (a?.charge)
+                this.game.cancelCharge();
         }
     }
-    /** 把瞄准拖动换算到世界坐标：拖满 = 最大施法距离；几乎没拖动 = 自动朝最近的敌人。 */
+    /** 把瞄准拖动换算到世界坐标，并给出这次出手合不合法（和模拟层用同一套查询）。
+     *  四种输入：点按 / 方向 / 落点 / 蓄力。拖满 = 最大施法距离；几乎没拖动 = 朝最近的敌人（方向）或选最近的合法目标（落点）。 */
     aimWorld(a) {
-        const g = this.game, p = g.player, S = g.skillsOf(p), mag = Math.hypot(a.ax, a.ay), kind = S[a.i]?.kind ?? 'line';
-        if (kind === 'buff')
-            return { x: p.x, y: p.y, dx: p.faceX, dy: p.faceY, ok: true };
-        const auto = mag < 0.18 ? g.pickPlayerTarget(p, 70) : null;
+        const g = this.game, p = g.player, S = g.skillsOf(p), s = S[a.i], mag = Math.hypot(a.ax, a.ay), mode = s?.aim ?? 'direction', dead = mag < 0.18;
+        if (!s || mode === 'tap')
+            return { x: p.x, y: p.y, dx: p.faceX, dy: p.faceY, ok: true, tap: true };
+        const auto = dead ? g.pickPlayerTarget(p, 70) : null;
         const tgt = auto && auto.kind !== 'tower' && auto.kind !== 'core' ? auto : null;
-        if (kind === 'line' || kind === 'cone' || kind === 'dash') {
+        if (mode === 'direction' || mode === 'charge') {
             let dx = a.ax, dy = a.ay;
-            if (mag < 0.18) {
-                if (tgt) {
+            if (dead) {
+                if (tgt && s.id !== 'guard') {
+                    dx = tgt.x - p.x;
+                    dy = tgt.y - p.y;
+                }
+                else if (tgt) {
                     dx = tgt.x - p.x;
                     dy = tgt.y - p.y;
                 }
@@ -212,15 +243,32 @@ export class Hud {
                     dy = p.faceY;
                 }
             }
-            const L = Math.hypot(dx, dy) || 1;
-            return { x: p.x + (dx / L) * S[a.i].range, y: p.y + (dy / L) * S[a.i].range, dx: dx / L, dy: dy / L, ok: true };
+            const L = Math.hypot(dx, dy) || 1, q = mode === 'charge' ? g.chargeQ() : undefined, range = mode === 'charge' ? s.minRange + (s.range - s.minRange) * (q ?? 0) : s.range ?? 40;
+            return { x: p.x + (dx / L) * range, y: p.y + (dy / L) * range, dx: dx / L, dy: dy / L, ok: true, q };
         }
-        const range = S[a.i].castRange;
+        // 拖满对应的距离比最大施法距离略短：前摇期间边走边放也不会因为走远了半步而超距落空
+        const range = Math.max(0.6 * (s.castRange ?? 100), (s.castRange ?? 100) - p.speed * (s.windupSeconds ?? 0) - 1), snapping = s.snapRadius != null;
         let x, y;
-        if (mag >= 0.18) {
+        if (!dead) {
             x = p.x + a.ax * range;
             y = p.y + a.ay * range;
         }
+        else if (snapping) { // 点按：施法者附近最近的合法目标
+            const pool = g.heroes.filter((h) => h.alive && h !== p && (s.id === 'backstep' ? h.team !== p.team && g.visible(h, p.team) : h.team === p.team) && Math.hypot(h.x - p.x, h.y - p.y) <= range + 0.5)
+                .sort((u, v) => Math.hypot(u.x - p.x, u.y - p.y) - Math.hypot(v.x - p.x, v.y - p.y) || u.id - v.id);
+            if (pool[0]) {
+                x = pool[0].x;
+                y = pool[0].y;
+            }
+            else {
+                x = p.x + p.faceX * range * 0.6;
+                y = p.y + p.faceY * range * 0.6;
+            }
+        }
+        else if (s.id === 'perch') {
+            x = p.x;
+            y = p.y;
+        } // 落灯点按：放在脚下
         else if (tgt) {
             const d = Math.hypot(tgt.x - p.x, tgt.y - p.y), k = Math.min(1, range / (d || 1));
             x = p.x + (tgt.x - p.x) * k;
@@ -230,15 +278,40 @@ export class Hud {
             x = p.x + p.faceX * range * 0.6;
             y = p.y + p.faceY * range * 0.6;
         }
-        const chk = { ok: true, reason: undefined };
-        return { x, y, dx: 0, dy: 0, ok: chk.ok, reason: chk.reason };
+        const w = { x, y, dx: 0, dy: 0, ok: true };
+        if (snapping) {
+            w.target = Skills.snapPreview(g, p, s, w);
+            if (!w.target) {
+                w.ok = false;
+                w.reason = 'target';
+            }
+            else if (s.id === 'backstep') {
+                w.spot = Skills.backstepSpot(g, p, w.target, s);
+                if (!w.spot) {
+                    w.ok = false;
+                    w.reason = 'spot';
+                }
+            }
+        }
+        else if ((s.id === 'perch' || s.id === 'snare' || s.id === 'ring') && !Skills.walkable(g, x, y, s.id === 'ring' ? p.r : 4)) {
+            w.ok = false;
+            w.reason = 'spot';
+        }
+        return w;
+    }
+    fail(i, reason) {
+        this.lastCast = { skill: i, ok: false, reason };
+        if (reason && REASON[reason])
+            this.toast = { text: REASON[reason], until: performance.now() + 1100 };
     }
     release(a) {
-        const g = this.game, w = this.aimWorld(a);
-        const res = g.castSkill(a.i, w);
+        const g = this.game;
+        if (a.charge && !g.player.sk.charge)
+            return; // 蓄力途中被打断（眩晕、阵亡）：不出手
+        const w = this.aimWorld(a), res = g.castSkill(a.i, { ...w, target: w.target?.id });
         this.lastCast = { skill: a.i, ok: res.ok, reason: res.reason };
-        if (!res.ok && res.reason && REASON[res.reason])
-            this.toast = { text: REASON[res.reason], until: performance.now() + 1100 };
+        if (!res.ok)
+            this.fail(a.i, res.reason);
     }
     /** 技能专属图标（assets/icons/icon-<英雄>-<技能>.png）：用到时才加载，加载失败就退回矢量图形 */
     iconCache = {};
@@ -336,6 +409,20 @@ export class Hud {
     /** 每帧把摇杆/键盘状态写进模拟层。 */
     sync() {
         const g = this.game, j = this.joy, k = this.keys;
+        if (this.aim?.charge && !g.player.sk.charge) {
+            this.aim = null;
+            this.aimId = -1;
+        }
+        for (const e of g.events)
+            if (e.type === 'castFail' && e.who === g.player.id && e.t > this.failT) {
+                this.failT = e.t;
+                if (REASON[e.reason])
+                    this.toast = { text: REASON[e.reason], until: performance.now() + 1100 };
+            }
+        if (g.time < this.failT)
+            this.failT = -1;
+        if (this.keyCharge >= 0 && !g.player.sk.charge)
+            this.keyCharge = -1;
         let mx = 0, my = 0;
         if (j.id >= 0) {
             const r = this.joyHome.r;
@@ -470,7 +557,7 @@ export class Hud {
         c.fillRect(-s * 0.06, s * 0.29, s * 0.12, s * 0.26);
         c.restore();
         // 技能键
-        const S = g.skillsOf(p), sb = this.skillBtns, isX = p.sprite === 'xingli', hcol = g.heroDef(p.sprite)?.color ?? '#ffe9a8';
+        const S = g.skillsOf(p), sb = this.skillBtns, isX = false, hcol = g.heroDef(p.sprite)?.color ?? '#ffe9a8';
         for (let i = 0; i < 3; i++) {
             const b = sb[i], cd = p.cds[i], active = this.aim?.i === i, lack = false;
             c.save();
@@ -479,7 +566,7 @@ export class Hud {
             c.clip();
             c.fillStyle = '#0f2a30';
             c.fillRect(b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
-            const img = isX ? this.icons[i] : this.skillIcon(p.sprite, S[i]?.id);
+            const img = this.skillIcon(p.sprite, S[i]?.id);
             if (!isX && S[i] && !(img && img.complete && img.naturalWidth)) {
                 c.globalAlpha = cd > 0 || !p.alive ? 0.45 : 1;
                 this.glyph(c, S[i].kind, b, hcol);
@@ -509,6 +596,33 @@ export class Hud {
                 c.font = `700 ${Math.round(b.r * 0.8)}px ${FONT}`;
                 c.fillText(cd < 1 ? cd.toFixed(1) : String(Math.ceil(cd)), b.x, b.y + 1);
             }
+            // 状态环：蓄力进度 / 持续状态剩余时间 / 有灯可召 / 返还闪一下
+            const k = p.sk, sid = S[i]?.id ?? '', T = g.time, arc = (f, col, lw = 4) => { c.strokeStyle = col; c.lineWidth = lw; c.beginPath(); c.arc(b.x, b.y, b.r + lw * 0.9, -Math.PI / 2, -Math.PI / 2 + Math.max(0, Math.min(1, f)) * Math.PI * 2); c.stroke(); };
+            if (k.charge && k.charge.i === i) {
+                const q = g.chargeQ();
+                arc(q, q >= 1 ? '#fff' : '#ffd27a', 5);
+            }
+            const left = sid === 'stance' ? k.stanceUntil - T : sid === 'veil' ? k.veilUntil - T : sid === 'guard' && k.guard ? k.guard.until - T : sid === 'ward' && k.ward ? k.ward.until - T : sid === 'thread' && k.thread ? k.thread.until - T : 0;
+            if (left > 0 && S[i].seconds)
+                arc(left / S[i].seconds, hcol, 3.5);
+            if (sid === 'recall' && g.lamps.some((l) => l.owner === p)) {
+                c.fillStyle = '#ffe9a8';
+                c.strokeStyle = '#1a2a2c';
+                c.lineWidth = 1.5;
+                c.beginPath();
+                c.arc(b.x + b.r * 0.72, b.y - b.r * 0.72, b.r * 0.2, 0, 7);
+                c.fill();
+                c.stroke();
+            }
+            if (sid === 'backstep')
+                for (const e of g.events)
+                    if (e.type === 'refund' && e.who === p.id && T - e.t < 0.5) {
+                        c.strokeStyle = `rgba(255,255,255,${1 - (T - e.t) / 0.5})`;
+                        c.lineWidth = 6;
+                        c.beginPath();
+                        c.arc(b.x, b.y, b.r + 5, 0, 7);
+                        c.stroke();
+                    }
         }
         // 取消区
         if (this.aim) {

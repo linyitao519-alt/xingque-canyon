@@ -108,7 +108,7 @@ with sync_playwright() as p:
     t.down(1, 150, 290); t.move(1, 115, 255)                                                   # 左手往左上走
     t.down(2, sk[0]['x'], sk[0]['y']); t.move(2, sk[0]['x'] + 78, sk[0]['y'] + 10); pg.evaluate(ADV, 12); s1 = pg.evaluate(STATE)
     check('两指同时操作：边走边拖满弦月 → 取景模式为"瞄准"，塔偏移让位，被锁定的塔改用箭头提示', s0['mode'] == 'tower' and s1['mode'] == 'aim' and s1['x'] < s0['x'] - 15 and any(h['locked'] for h in s1['hints']), {'before': s0['mode'], 'during': s1['mode'], 'hints': len(s1['hints'])})
-    t.up(2); pg.evaluate(ADV, 3); s2 = pg.evaluate(STATE)
+    t.up(2); pg.evaluate(ADV, 6); s2 = pg.evaluate(STATE)
     check('松手施放弦月并进入冷却', s2['cds'][0] > 3)
     t.up(1); pg.close()
 

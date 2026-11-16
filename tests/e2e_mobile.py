@@ -54,7 +54,7 @@ with sync_playwright() as p:
     # ---------- 0. 加载 ----------
     wait(500)
     check('页面加载无报错', not errors, errors[:3])
-    check('三个技能图标已加载（256×256 透明 PNG）', ev("[...Array(3)].every((_, i) => __xq.hud.icons[i].naturalWidth === 256)"))
+    check('三个技能图标已加载（256×256 透明 PNG）', ev("(() => { const ic = Object.values(__xq.hud.iconCache); return ic.length === 3 && ic.every(i => i.naturalWidth === 256); })()"))
     check('运行时素材已加载（25 张单件 + 3 张地表贴图）', ev('__xq.art.length') == 28, ev('__xq.art.length'))
     page.wait_for_function('__xq.renderer.sceneReady'); check('中路底图和 10 张遮挡片已加载', ev('Object.keys(__xq.renderer.occImgs).length') == 10)
     check('默认不显示调试射程圈', ev('__xq.renderer.debug') is False)
@@ -94,7 +94,7 @@ with sync_playwright() as p:
     touch.down(2, sk[2]['x'], sk[2]['y']); touch.move(2, sk[2]['x'] - 60, sk[2]['y'] + 50); wait(150)
     aim_ok = ev("__xq.hud.aimWorld(__xq.hud.aim).ok")
     page.screenshot(path=f'{OUT}/e2e-starfield-aim.png')
-    touch.up(2); wait(200)
+    touch.up(2); wait(450)
     st3 = ev("({cast: __xq.hud.lastCast, cd: __xq.game.player.cds[2], zones: __xq.game.zones.length})")
     check('星河阵在落点展开并进入冷却', aim_ok and st3['cast']['skill'] == 2 and st3['cast']['ok'] and st3['cd'] > 20 and st3['zones'] == 1, st3)
     # 冷却中再按：取消且提示

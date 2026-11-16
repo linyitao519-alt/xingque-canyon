@@ -22,6 +22,7 @@ def convert(name, src):
         names = ', '.join(p.strip().replace(' as ', ': ') for p in mo.group(1).split(',') if p.strip())
         return f"const {{ {names} }} = __m['{mo.group(2)}'];"
     src = re.sub(r"^import\s*\{([^}]*)\}\s*from\s*'\./([\w-]+)\.js';?", imp, src, flags=re.M)
+    src = re.sub(r"^import\s*\*\s*as\s+(\w+)\s+from\s*'\./([\w-]+)\.js';?", lambda mo: f"const {mo.group(1)} = __m['{mo.group(2)}'];", src, flags=re.M)   # import * as X
     assert not re.search(r'^import\s', src, flags=re.M), (name, re.findall(r'^import.*$', src, flags=re.M))
     def exp(mo): exports.append(mo.group(2)); return mo.group(1) + mo.group(2)
     src = re.sub(r'^export\s+((?:async\s+)?(?:function\*?|class|const|let|var)\s+)([A-Za-z_$][\w$]*)', exp, src, flags=re.M)

@@ -1,17 +1,17 @@
 {
   "name": "xingque-canyon",
-  "version": "0.14.0",
+  "version": "0.1.0",
+  "private": true,
   "type": "module",
-  "description": "星阙峡谷 · 手机横屏单人三路 MOBA 原型（TypeScript，three.js / Canvas 2D 渲染）",
+  "description": "星阙峡谷 · 手机横屏单人三路 MOBA 原型 (TypeScript + Canvas)",
   "scripts": {
     "build": "tsc -p .",
     "watch": "tsc -p . --watch",
     "start": "node server.mjs",
     "dev": "tsc -p . && node server.mjs",
-    "test": "node --test tests/sim.test.mjs tests/anim.test.mjs"
+    "test": "node --test tests/sim.test.mjs tests/anim.test.mjs tests/skills.test.mjs"
   },
   "devDependencies": {
     "typescript": ">=5.4"
-  },
-  "license": "MIT"
+  }
 }

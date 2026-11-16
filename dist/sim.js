@@ -1,6 +1,7 @@
 // 对局模拟层：不依赖 DOM，可在 Node 里无画面运行（见 tests/）。
 // 数值全部来自 assets/data/map.json 与 match-rules.json。
 import { NavGrid, Polyline } from './nav.js';
+import * as Skills from './skills.js';
 export const LANES = ['north', 'mid', 'south'];
 export const TEAMS = ['blue', 'red'];
 export const enemyOf = (t) => (t === 'blue' ? 'red' : 'blue');
@@ -46,6 +47,17 @@ export class Game {
     navDirty = false;
     /** 玩家操控的英雄 ID（改后调用 reset() 生效） */
     playerHero = 'xingli';
+    /** 指定红方中路的英雄（平衡跑批用；空 = 默认阵容） */
+    enemyMid = '';
+    /** AI 英雄是否使用技能（?aiskills=1；托管玩家英雄时总是使用） */
+    aiSkills = false;
+    /** 只决定各英雄 AI 首次决策的相位（0–0.19 秒），不影响任何数值 */
+    seed = 0;
+    lamps = [];
+    traps = [];
+    rings = [];
+    flyers = [];
+    castSeq = 0;
     waves = 0;
     /** extra = 布景里会挡路的物件（assets/data/scenery.json 中 blockRadius>0 的岩石和树） */
     constructor(map, rules, extra = []) {
@@ -71,6 +83,7 @@ export class Game {
         this.marks = [];
         this.zones = [];
         this.events = [];
+        Skills.reset(this);
         this.pending = [];
         this.kills = { blue: 0, red: 0 };
         this.input = { mx: 0, my: 0, attack: false };
@@ -108,6 +121,13 @@ export class Game {
                         roster[tm][k] = roster.blue[0];
                         roster.blue[0] = d;
                     } });
+            // 红方中路是 roster.red[1]（redBotLanes = 上、中、下）
+            if (this.enemyMid && this.enemyMid !== this.playerHero)
+                for (const tm of TEAMS)
+                    roster[tm].forEach((d, k) => { if (d.sprite === this.enemyMid && !(tm === 'red' && k === 1)) {
+                        roster[tm][k] = roster.red[1];
+                        roster.red[1] = d;
+                    } });
             roster[team].forEach((def, i) => {
                 const spawn = [sp[0] + (i - 1) * 18, sp[1]], hdef = rules.heroes?.[def.sprite], hp = hdef?.hp ?? hd.hp;
                 const h = {
@@ -115,7 +135,7 @@ export class Game {
                     isPlayer: team === 'blue' && i === 0, lane: lanes[i], speed: hd.moveSpeed, atkCd: 0, atkT: -9, windup: null,
                     respawn: 0, spawn, ai: 'lane', moving: false, path: null, pi: 0, pgx: 0, pgy: 0, repath: 0,
                     cds: [0, 0, 0], castT: -9, kills: 0, deaths: 0, fwd: 0,
-                    ba: { ...(hdef?.basicAttack ?? hd.basicAttack) }, shield: 0, shieldUntil: 0, hasteUntil: 0, hasteFrac: 0, atkBuffUntil: 0, atkBuffMul: 1, dash: null,
+                    ba: { ...(hdef?.basicAttack ?? hd.basicAttack) }, shield: 0, shieldUntil: 0, hasteUntil: 0, hasteFrac: 0, atkBuffUntil: 0, atkBuffMul: 1, dash: null, sk: Skills.newState(),
                 };
                 this.heroes.push(h);
                 if (h.isPlayer)
@@ -125,6 +145,7 @@ export class Game {
         this.rebuildNav();
         for (const h of this.heroes)
             this.resolve(h);
+        this.heroes.forEach((h, i) => { h.sk.aiNext = (((this.seed * 7919 + i * 104729) % 20) + 20) % 20 / 100; });
     }
     rebuildNav() {
         const { map } = this;
@@ -172,9 +193,10 @@ export class Game {
     }
     /** 草丛可见性：建筑恒可见；草丛里的单位只对同阵营、同草丛的敌人或被短时揭露时可见。 */
     visible(u, team) {
-        if (u.team === team || u.kind === 'tower' || u.kind === 'core' || u.brush < 0)
+        if (u.team === team || u.kind === 'tower' || u.kind === 'core')
             return true;
-        return u.revealUntil > this.time || this.occ[team === 'blue' ? 0 : 1][u.brush] === true;
+        const base = u.brush < 0 || u.revealUntil > this.time || this.occ[team === 'blue' ? 0 : 1][u.brush] === true;
+        return Skills.visible(this, u, team, base); // 匿影、落灯照明
     }
     brushAt(x, y) {
         const b = this.map.brush;
@@ -247,8 +269,7 @@ export class Game {
             if (t.alive)
                 this.updateTower(t, dt);
         this.updateProjectiles(dt);
-        this.updateCrescents(dt);
-        this.updateZones();
+        Skills.update(this, dt);
         this.marks = this.marks.filter((m) => m.expire > this.time);
         this.separate();
         if (this.minions.some((m) => !m.alive))
@@ -314,7 +335,7 @@ export class Game {
         const L = Math.hypot(dx, dy);
         if (L < 1e-6 || this.time < u.rootUntil)
             return;
-        const sp = u.speed * (this.time < u.slowUntil ? 1 - u.slowFrac : 1) * (u.kind === 'hero' && this.time < u.hasteUntil ? 1 + u.hasteFrac : 1);
+        const sp = u.speed * Skills.speedMul(this, u);
         const s = Math.min(sp * dt, maxDist);
         u.x += (dx / L) * s;
         u.y += (dy / L) * s;
@@ -367,20 +388,13 @@ export class Game {
         }
     }
     // ---------------------------------------------------------------- 伤害
-    damage(src, tgt, amount) {
+    damage(src, tgt, amount, opts) {
         if (!tgt.alive || this.over || !this.attackable(tgt))
             return;
-        if (tgt.kind === 'hero' && tgt.shield > 0) {
-            if (this.time >= tgt.shieldUntil)
-                tgt.shield = 0;
-            else {
-                const ab = Math.min(tgt.shield, amount);
-                tgt.shield -= ab;
-                amount -= ab;
-            }
-        }
+        amount = Skills.preDamage(this, src, tgt, amount, opts); // 护阵分流 → 举盾格挡 → 护盾吸收
         tgt.hp -= amount;
-        tgt.hitT = this.time;
+        if (amount > 0)
+            tgt.hitT = this.time;
         if (tgt.kind === 'tower' || tgt.kind === 'core')
             this.events.push({ type: 'structHit', t: this.time, x: tgt.x, y: tgt.y, team: tgt.team }); // 只给音效/特效用
         if (src && src.kind === 'hero' && tgt.kind === 'hero')
@@ -390,10 +404,13 @@ export class Game {
                     t.target = src;
         if (src === this.player || tgt === this.player)
             this.events.push({ type: 'dmg', t: this.time, x: tgt.x, y: tgt.y, amount, mine: src === this.player });
-        if (tgt.hp > 0)
+        if (tgt.hp > 0) {
+            Skills.postDamage(this, src, tgt, amount, false);
             return;
+        }
         tgt.hp = 0;
         tgt.alive = false;
+        Skills.postDamage(this, src, tgt, amount, true);
         if (tgt.kind === 'hero') {
             tgt.respawn = this.rules.heroDefaults.respawnSeconds;
             tgt.windup = null;
@@ -434,6 +451,8 @@ export class Game {
                 h.hasteUntil = h.atkBuffUntil = 0;
                 h.dash = null;
                 h.stunned = false;
+                Skills.clear(this, h);
+                h.sk.exposedUntil = 0;
                 this.resolve(h);
                 this.events.push({ type: 'respawn', t: this.time, x: h.x, y: h.y, team: h.team });
             }
@@ -448,37 +467,31 @@ export class Game {
         if (h.windup && (h.windup.t -= dt) <= 0) {
             const t = h.windup.target;
             h.windup = null;
-            const ba = h.ba;
-            if (t.alive && dist(h, t) - t.r <= ba.range + 30) {
+            const ba = h.ba, dmg = Skills.attackDamage(this, h, t); // 伤害在出手瞬间定下（鹰眼的远距加成）
+            if (t.alive && dist(h, t) - t.r <= Skills.attackRange(this, h) + 30) {
+                Skills.onAttack(this, h);
                 if (ba.range <= 50) {
-                    this.damage(h, t, ba.damage);
+                    this.damage(h, t, dmg);
                     this.events.push({ type: 'hit', t: this.time, x: t.x, y: t.y });
                 } // 近战：前摇结束直接结算
                 else
-                    this.projectiles.push({ x: h.x, y: h.y, target: t, src: h, dmg: ba.damage, speed: 300, style: 'hero', team: h.team });
+                    this.projectiles.push({ x: h.x, y: h.y, target: t, src: h, dmg, speed: 300, style: 'hero', team: h.team });
                 this.reveal(h);
                 this.events.push({ type: 'shot', t: this.time, x: h.x, y: h.y, player: h.isPlayer });
             }
         }
         h.moving = false;
-        if (h.shield > 0 && this.time >= h.shieldUntil)
-            h.shield = 0;
-        if (h.dash) {
-            this.stepDash(h, dt);
-            return;
-        }
-        if (this.time >= h.rootUntil)
-            h.stunned = false;
-        if (h.stunned)
-            return; // 眩晕：不能移动也不能出手
+        if (Skills.heroTick(this, h, dt))
+            return; // 被推拉、突进、跃击或眩晕：这一步不能自由行动
         if (h.isPlayer && !this.autopilot)
             this.controlPlayer(h, dt);
         else
             this.controlBot(h, dt);
+        Skills.afterMove(this, h);
     }
     /** 普攻：0.18s 前摇后在释放点生成弹体。 */
     heroAttack(h, t) {
-        if (h.atkCd > 0 || h.windup)
+        if (h.atkCd > 0 || h.windup || !Skills.canAttack(this, h))
             return false;
         h.windup = { t: 0.18, target: t };
         h.atkCd = h.ba.interval * (this.time < h.atkBuffUntil ? h.atkBuffMul : 1);
@@ -490,7 +503,7 @@ export class Game {
     }
     /** 星璃普攻选敌：射程内英雄优先，其次小兵，最后可攻击建筑。 */
     pickPlayerTarget(h = this.player, extra = 0) {
-        const range = h.ba.range + extra;
+        const range = Skills.attackRange(this, h) + extra;
         const pick = (list) => {
             let best = null, bd = Infinity;
             for (const u of list) {
@@ -547,7 +560,8 @@ export class Game {
         this.heroGoto(h, gx, gy, dt);
     }
     controlBot(h, dt) {
-        const B = this.rules.bots, range = h.ba.range;
+        Skills.ai(this, h);
+        const B = this.rules.bots, range = Skills.attackRange(this, h);
         const frac = h.hp / h.maxHp;
         if (h.ai === 'lane' && frac < B.retreatBelowHpFraction)
             h.ai = 'retreat';
@@ -607,262 +621,20 @@ export class Game {
             this.heroGoto(h, t.x, t.y, dt);
         if (need <= 0)
             this.heroAttack(h, t);
-        if (h.isPlayer && t.kind !== 'tower' && t.kind !== 'core')
-            this.autoSkills(h, t);
-    }
-    /** 代打时的技能使用（仅 autopilot）：按技能类型在够得着时对当前目标出手。 */
-    autoSkills(h, t) {
-        const d = dist(h, t) || 1, ux = (t.x - h.x) / d, uy = (t.y - h.y) / d, aim = { x: t.x, y: t.y, dx: ux, dy: uy };
-        this.skillsOf(h).forEach((s, i) => {
-            if (h.cds[i] > 0)
-                return;
-            if (s.kind === 'line' || s.kind === 'cone') {
-                if (d < s.range - 6)
-                    this.castSkill(i, aim, h);
-            }
-            else if (s.kind === 'dash') {
-                if (d < s.range - 6 && d > 36 && t.kind === 'hero')
-                    this.castSkill(i, aim, h);
-            }
-            else if (s.kind === 'ground-circle') {
-                if (d < s.castRange - 8)
-                    this.castSkill(i, aim, h);
-            }
-            else if (s.kind === 'zone') {
-                if (d < s.castRange - 8 && t.kind === 'hero')
-                    this.castSkill(i, aim, h);
-            }
-            else if (s.kind === 'buff') {
-                if (h.hp < h.maxHp * 0.7 || (t.kind === 'hero' && d < 120))
-                    this.castSkill(i, aim, h);
-            }
-        });
     }
     // ---------------------------------------------------------------- 技能
     /** 弦月 / 定星的便捷入口（测试和调试用）；实际结算都在 castSkill */
     castCrescent(dx, dy) { return this.castSkill(0, { x: this.player.x + dx, y: this.player.y + dy, dx, dy }); }
     castBeacon(x, y) { return this.castSkill(1, { x, y, dx: x - this.player.x, dy: y - this.player.y }); }
-    /** 某英雄的三个技能定义。星璃沿用 rules.xingli.skills，其余读 rules.heroes[id].skills */
-    skillsOf(h = this.player) { return h.sprite === 'xingli' ? this.rules.xingli.skills : (this.rules.heroes?.[h.sprite]?.skills ?? []); }
+    /** 某英雄的三个技能定义：读 rules.heroes[id].skills（v0.16 的 rules.xingli.skills 作为回退） */
+    skillsOf(h = this.player) { return this.rules.heroes?.[h.sprite]?.skills ?? (h.sprite === 'xingli' ? this.rules.xingli?.skills : null) ?? []; }
     heroDef(id) { return this.rules.heroes?.[id]; }
-    /** 通用技能出手（六名英雄都走这里）。(dx, dy) = 瞄准方向，(x, y) = 落点。按 kind 结算。 */
-    castSkill(i, aim, h = this.player) {
-        if (this.over)
-            return { ok: false, reason: 'over' };
-        if (!h.alive)
-            return { ok: false, reason: 'dead' };
-        if (h.cds[i] > 0)
-            return { ok: false, reason: 'cooldown' };
-        if (h.dash || h.stunned)
-            return { ok: false, reason: 'busy' };
-        const s = this.skillsOf(h)[i];
-        if (!s)
-            return { ok: false, reason: 'none' };
-        let { dx, dy } = aim;
-        let L = Math.hypot(dx, dy);
-        if (L < 1e-6) {
-            dx = h.faceX;
-            dy = h.faceY;
-            L = Math.hypot(dx, dy) || 1;
-        }
-        dx /= L;
-        dy /= L;
-        const fx = `fx-${h.sprite}-${s.id}`;
-        const T = this.time, slow = s.slowFraction ? [s.slowFraction, s.slowSeconds ?? 1] : undefined;
-        const hitFx = (u) => {
-            u.revealUntil = T + 1.5;
-            if (slow) {
-                u.slowUntil = T + slow[1];
-                u.slowFrac = slow[0];
-            }
-            if (s.stunSeconds && u.kind !== 'tower' && u.kind !== 'core') {
-                u.rootUntil = T + s.stunSeconds;
-                if (u.kind === 'hero')
-                    u.stunned = true;
-            }
-            this.events.push({ type: 'hit', t: T, x: u.x, y: u.y });
-        };
-        if (s.kind === 'line') {
-            this.crescents.push({ x: h.x, y: h.y, dx, dy, left: s.range, hit: new Set(), src: h, width: s.width ?? 20, damage: s.damage ?? 0, style: h.sprite === 'xingli' ? 'crescent' : 'bolt', slow, ret: s.returns ? s.returnDamageFraction ?? 0.5 : 0, mark: s.markSeconds ?? 0, fx });
-            h.faceX = dx;
-            h.faceY = dy;
-        }
-        else if (s.kind === 'ground-circle') {
-            if (Math.hypot(aim.x - h.x, aim.y - h.y) > s.castRange + 0.5)
-                return { ok: false, reason: 'range' };
-            for (const u of this.enemiesOf(h.team))
-                if (Math.hypot(u.x - aim.x, u.y - aim.y) <= s.radius + u.r * 0.5) {
-                    hitFx(u);
-                    let dmg = s.damage ?? 0;
-                    if (s.markBonusDamage && u.moonUntil > T) { // 引爆月痕：额外伤害 + 定身，月痕消耗
-                        dmg += s.markBonusDamage;
-                        u.moonUntil = 0;
-                        if (s.markRootSeconds)
-                            u.rootUntil = Math.max(u.rootUntil, T + s.markRootSeconds);
-                        this.events.push({ type: 'detonate', t: T, x: u.x, y: u.y });
-                    }
-                    this.damage(h, u, dmg);
-                }
-            if (s.healAllies)
-                for (const a of this.heroes)
-                    if (a.team === h.team && a.alive && Math.hypot(a.x - aim.x, a.y - aim.y) <= s.radius + a.r)
-                        a.hp = Math.min(a.maxHp, a.hp + s.healAllies);
-            this.events.push({ type: 'beacon', t: T, x: aim.x, y: aim.y, r: s.radius, fx });
-        }
-        else if (s.kind === 'zone') {
-            if (Math.hypot(aim.x - h.x, aim.y - h.y) > s.castRange + 0.5)
-                return { ok: false, reason: 'range' };
-            const tick = s.tickSeconds ?? 0.5;
-            this.zones.push({ x: aim.x, y: aim.y, r: s.radius, born: T, until: T + (s.seconds ?? 3), next: T + tick, tick, dmg: s.tickDamage ?? 0, slow: s.slowFraction ?? 0, final: s.finalDamage ?? 0, finalRoot: s.finalRootSeconds ?? 0, src: h });
-            this.events.push({ type: 'zone', t: T, x: aim.x, y: aim.y, r: s.radius });
-        }
-        else if (s.kind === 'cone') {
-            const half = ((s.angleDeg ?? 90) * Math.PI) / 360;
-            for (const u of this.enemiesOf(h.team)) {
-                const ux = u.x - h.x, uy = u.y - h.y, d = Math.hypot(ux, uy);
-                if (d - u.r > s.range)
-                    continue;
-                if (d > 1e-3 && Math.acos(Math.max(-1, Math.min(1, (ux * dx + uy * dy) / d))) > half + Math.atan2(u.r, d))
-                    continue;
-                hitFx(u);
-                this.damage(h, u, s.damage ?? 0);
-            }
-            h.faceX = dx;
-            h.faceY = dy;
-            this.events.push({ type: 'cone', t: T, x: h.x, y: h.y, dx, dy, r: s.range, angle: half * 2, fx });
-        }
-        else if (s.kind === 'dash') {
-            h.dash = { dx, dy, left: s.range, damage: s.damage ?? 0, stun: s.stunSeconds ?? 0, hit: new Set() };
-            h.faceX = dx;
-            h.faceY = dy;
-            h.windup = null;
-            this.events.push({ type: 'dash', t: T, x: h.x, y: h.y, dx, dy, r: s.range });
-        }
-        else if (s.kind === 'buff') {
-            const dur = s.seconds ?? 3, area = (s.radius ?? 0) > 0;
-            const apply = (a, self) => {
-                const sh = self ? s.shield : s.allyShield, hl = self ? s.heal : s.allyHeal;
-                if (sh) {
-                    a.shield = Math.max(a.shield, sh);
-                    a.shieldUntil = T + dur;
-                    a.shieldFx = fx;
-                }
-                if (hl)
-                    a.hp = Math.min(a.maxHp, a.hp + hl);
-                if (s.hasteFraction && (self || area)) {
-                    a.hasteUntil = T + dur;
-                    a.hasteFrac = s.hasteFraction;
-                }
-                if (self && s.attackIntervalMultiplier) {
-                    a.atkBuffUntil = T + dur;
-                    a.atkBuffMul = s.attackIntervalMultiplier;
-                }
-            };
-            apply(h, true);
-            if (area)
-                for (const a of this.heroes)
-                    if (a !== h && a.team === h.team && a.alive && dist(a, h) <= s.radius)
-                        apply(a, false);
-            this.events.push({ type: 'buff', t: T, x: h.x, y: h.y, r: Math.max(18, s.radius ?? 0), secs: dur, who: h.id });
-        }
-        else
-            return { ok: false, reason: 'none' };
-        h.cds[i] = s.cooldownSeconds;
-        h.castT = T;
-        this.reveal(h);
-        this.events.push({ type: 'cast', t: T, x: h.x, y: h.y, skill: s.kind === 'line' ? 0 : i });
-        return { ok: true };
-    }
-    /** 突进：高速直线位移（撞到障碍会被挡住），沿途每个敌人结算一次伤害（可带眩晕）。期间不接受移动和普攻。 */
-    stepDash(h, dt) {
-        const d = h.dash, step = Math.min(460 * dt, d.left), px = h.x, py = h.y;
-        h.x += d.dx * step;
-        h.y += d.dy * step;
-        h.moving = true;
-        this.resolve(h);
-        for (const u of this.enemiesOf(h.team)) {
-            if (d.hit.has(u.id) || dist(u, h) > h.r + u.r + 8)
-                continue;
-            d.hit.add(u.id);
-            u.revealUntil = this.time + 1.5;
-            if (d.stun) {
-                u.rootUntil = this.time + d.stun;
-                if (u.kind === 'hero')
-                    u.stunned = true;
-            }
-            this.damage(h, u, d.damage);
-            this.events.push({ type: 'hit', t: this.time, x: u.x, y: u.y });
-        }
-        d.left -= step;
-        if (d.left <= 0.01 || Math.hypot(h.x - px, h.y - py) < step * 0.35)
-            h.dash = null; // 走完或被挡住
-    }
-    updateZones() {
-        const T = this.time;
-        for (const z of this.zones) {
-            const inside = () => this.enemiesOf(z.src.team).filter((u) => Math.hypot(u.x - z.x, u.y - z.y) <= z.r + u.r * 0.5);
-            while (z.next <= T + 1e-9 && z.next <= z.until + 1e-9) {
-                for (const u of inside()) {
-                    u.revealUntil = T + 1.5;
-                    if (z.slow) {
-                        u.slowUntil = Math.max(u.slowUntil, T + z.tick + 0.15);
-                        u.slowFrac = z.slow;
-                    }
-                    this.damage(z.src, u, z.dmg);
-                    this.events.push({ type: 'hit', t: T, x: u.x, y: u.y });
-                }
-                z.next += z.tick;
-            }
-            if (T >= z.until) {
-                for (const u of inside()) {
-                    if (z.finalRoot)
-                        u.rootUntil = Math.max(u.rootUntil, T + z.finalRoot);
-                    this.damage(z.src, u, z.final);
-                }
-                this.events.push({ type: 'beacon', t: T, x: z.x, y: z.y, r: z.r }, { type: 'zoneEnd', t: T, x: z.x, y: z.y });
-            }
-        }
-        this.zones = this.zones.filter((z) => T < z.until);
-    }
-    updateCrescents(dt) {
-        const speed = 430;
-        for (const c of this.crescents) {
-            const s = c;
-            const stepLen = Math.min(speed * dt, c.left), nx = c.x + c.dx * stepLen, ny = c.y + c.dy * stepLen;
-            for (const u of this.enemiesOf(c.src.team)) {
-                if (c.hit.has(u.id))
-                    continue;
-                const t = Math.max(0, Math.min(stepLen, (u.x - c.x) * c.dx + (u.y - c.y) * c.dy));
-                if (Math.hypot(c.x + c.dx * t - u.x, c.y + c.dy * t - u.y) <= s.width / 2 + u.r) {
-                    c.hit.add(u.id);
-                    u.revealUntil = this.time + 1.5;
-                    if (c.mark)
-                        u.moonUntil = this.time + c.mark;
-                    if (c.slow) {
-                        u.slowUntil = this.time + c.slow[1];
-                        u.slowFrac = c.slow[0];
-                    }
-                    this.damage(c.src, u, s.damage);
-                    this.events.push({ type: 'hit', t: this.time, x: u.x, y: u.y });
-                }
-            }
-            c.x = nx;
-            c.y = ny;
-            c.left -= stepLen;
-            if (c.left <= 0.01 && c.ret > 0 && !c.back && c.src.alive) { // 到头折返：朝施法者当前位置飞回，重新结算一轮（伤害打折）
-                const bx = c.src.x - c.x, by = c.src.y - c.y, L = Math.hypot(bx, by);
-                if (L > 12) {
-                    c.back = true;
-                    c.dx = bx / L;
-                    c.dy = by / L;
-                    c.left = L;
-                    c.damage *= c.ret;
-                    c.hit = new Set();
-                }
-            }
-        }
-        this.crescents = this.crescents.filter((c) => c.left > 0.01);
-    }
+    /** 技能受理：验证后进入前摇，前摇结束才出手并扣冷却。规则全部在 src/skills.ts。 */
+    castSkill(i, aim, h = this.player) { return Skills.cast(this, i, aim, h); }
+    /** 按住蓄力（满弦）：按下开始计时，松手时调 castSkill，取消调 cancelCharge */
+    beginCharge(i, h = this.player) { return Skills.beginCharge(this, i, h); }
+    cancelCharge(h = this.player) { Skills.cancelCharge(this, h); }
+    chargeQ(h = this.player) { return Skills.chargeQ(this, h); }
     // ---------------------------------------------------------------- 小兵
     updateMinion(m, dt) {
         m.atkCd = Math.max(0, m.atkCd - dt);
