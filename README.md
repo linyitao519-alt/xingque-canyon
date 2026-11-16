@@ -10,6 +10,8 @@ A single-player 3-lane mobile MOBA prototype that runs in the browser. Code writ
 
 演示视频：[docs/demo.mp4](docs/demo.mp4)
 
+技能混剪（18 秒）：[docs/skills-mix.mp4](docs/skills-mix.mp4)
+
 ## 现在有什么
 
 - 三路地图、兵线、寻路、防御塔（按外塔到内塔的顺序解锁）、基地水晶，一局可以打到结算
