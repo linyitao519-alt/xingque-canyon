@@ -1,0 +1,1252 @@
+{
+ "version": 1,
+ "canvas": {
+  "size": [
+   1881,
+   836
+  ],
+  "origin": "top-left",
+  "units": "px"
+ },
+ "projection": {
+  "formula": "u = 957.5 + 6.1 * (X - 600);  v = 403.3 + 3.8796 * (Y - 600)",
+  "matrixWorldToPx": [
+   [
+    6.1,
+    0,
+    -2702.5
+   ],
+   [
+    0,
+    3.8796,
+    -1924.46
+   ]
+  ],
+  "inverse": "X = 600 + (u - 957.5) / 6.1;  Y = 600 + (v - 403.3) / 3.8796",
+  "pxPerWorldUnitX": 6.1,
+  "pxPerWorldUnitY": 3.8796,
+  "groundCompressionKY": 0.636,
+  "anchor": {
+   "what": "罗盘中心 = 桥中心",
+   "px": [
+    957.5,
+    403.3
+   ],
+   "world": [
+    600,
+    600
+   ]
+  },
+  "worldAxes": "世界 X 向右、Y 向下；物体的高度方向 = 图上的正上方，1 世界单位高 = 6.1px",
+  "source": "src/render.ts 的 Camera.toScreen（tools/export_layout_guide.mjs 调用），与 scenery.json 登记的公式相差 < 0.05px",
+  "inGame": "游戏内屏高 120 世界单位：模板 1px 在屏幕上是 (屏幕高度 / 120) / 6.1 个 CSS 像素，390 高的手机上约 0.53"
+ },
+ "roadWidth": {
+  "perpendicularPx": 419.2,
+  "alongProjectedLaneNormalPx": 462.6,
+  "horizontalChordPx": 825.7,
+  "verticalChordPx": 486.6,
+  "unprojectedGroundPx": 561.2,
+  "roadSlopeOnImage": 0.5893,
+  "riverSlopeOnImage": 0.6407,
+  "explanation": {
+   "perpendicularPx": "垂直于图上路向量出的两条路沿间距——就是之前说的 421px，重绘时用这个",
+   "alongProjectedLaneNormalPx": "沿\"世界里垂直于路的方向\"投影到图上后量出的间距（桥面台阶的方向）",
+   "horizontalChordPx": "水平方向横穿石路的长度",
+   "verticalChordPx": "竖直方向横穿石路的长度",
+   "unprojectedGroundPx": "92 世界单位 × 6.1 = 561px 是没做斜向压缩时的地面宽度，在这张图上任何方向都量不出来；上一轮我把它写成了路宽，是错的，请以模板里的两条路沿为准"
+  }
+ },
+ "lane": {
+  "halfWidthWorld": 46,
+  "centerlinePx": [
+   [
+    223.2,
+    836.0
+   ],
+   [
+    957.5,
+    403.3
+   ],
+   [
+    1641.9,
+    0.0
+   ]
+  ],
+  "edgeNWPx": [
+   [
+    0.0,
+    724.3
+   ],
+   [
+    766.8,
+    272.4
+   ],
+   [
+    1229.0,
+    0.0
+   ]
+  ],
+  "edgeSEPx": [
+   [
+    636.1,
+    836.0
+   ],
+   [
+    1148.2,
+    534.2
+   ],
+   [
+    1881.0,
+    102.4
+   ]
+  ],
+  "note": "画面内是直线；路沿是重绘依据，路面上不放任何立体物"
+ },
+ "river": {
+  "halfWidthWorld": 38,
+  "centerlinePx": [
+   [
+    328.1,
+    0.0
+   ],
+   [
+    957.5,
+    403.3
+   ],
+   [
+    1632.8,
+    836.0
+   ]
+  ],
+  "bankSWPx": [
+   [
+    1.8,
+    0.0
+   ],
+   [
+    793.0,
+    507.2
+   ],
+   [
+    1306.4,
+    836.0
+   ]
+  ],
+  "bankNEPx": [
+   [
+    654.5,
+    0.0
+   ],
+   [
+    1122.0,
+    299.4
+   ],
+   [
+    1881.0,
+    786.0
+   ]
+  ],
+  "note": "河道整段可通行（map.json: blocksMovement=false）"
+ },
+ "bridge": {
+  "centerPx": [
+   957.5,
+   403.3
+  ],
+  "cornersWorld": {
+   "W": [
+    539.7,
+    593.2
+   ],
+   "N": [
+    595.5,
+    541.5
+   ],
+   "E": [
+    660.3,
+    606.8
+   ],
+   "S": [
+    604.5,
+    658.5
+   ]
+  },
+  "cornersPx": {
+   "W": [
+    589.6,
+    376.8
+   ],
+   "N": [
+    929.8,
+    176.3
+   ],
+   "E": [
+    1325.4,
+    429.8
+   ],
+   "S": [
+    985.2,
+    630.3
+   ]
+  },
+  "cornerNames": "W=西(左) N=北(上) E=东(右) S=南(下)，即路沿与河岸的四个交点"
+ },
+ "entrances": [
+  {
+   "world": [
+    454,
+    558
+   ],
+   "px": [
+    66.9,
+    240.4
+   ],
+   "keepoutRadiusWorld": 30,
+   "keepoutPx": [
+    183.0,
+    116.4
+   ]
+  },
+  {
+   "world": [
+    746,
+    642
+   ],
+   "px": [
+    1848.1,
+    566.2
+   ],
+   "keepoutRadiusWorld": 30,
+   "keepoutPx": [
+    183.0,
+    116.4
+   ]
+  }
+ ],
+ "walkableWater": {
+  "polygonsPx": [
+   [
+    [
+     986,
+     630
+    ],
+    [
+     1305,
+     835
+    ],
+    [
+     1880,
+     835
+    ],
+    [
+     1878,
+     784
+    ],
+    [
+     1327,
+     431
+    ]
+   ],
+   [
+    [
+     2,
+     0
+    ],
+    [
+     589,
+     376
+    ],
+    [
+     929,
+     176
+    ],
+    [
+     654,
+     0
+    ]
+   ]
+  ],
+  "note": "河道内除桥面外的全部水面都能走：要画成看得出能蹚过去的浅水，不要画深水和高墙"
+ },
+ "placement": {
+  "rules": {
+   "objectFootprintMinDistFromLaneCenter": 52,
+   "objectFootprintMinDistFromRiverCenter": 36,
+   "entranceKeepoutRadius": 30,
+   "canvasEdgeMarginPx": 24,
+   "note": "单位为世界单位（除注明 px 的）。物体落地轮廓必须整体落在 allowedZones 内；allowedZones 已按落地半径 10 世界单位（61px）向内收过。"
+  },
+  "allowedZonesPx": [
+   [
+    [
+     1198,
+     811
+    ],
+    [
+     1018,
+     696
+    ],
+    [
+     823,
+     811
+    ]
+   ],
+   [
+    [
+     484,
+     354
+    ],
+    [
+     311,
+     243
+    ],
+    [
+     307,
+     271
+    ],
+    [
+     291,
+     303
+    ],
+    [
+     266,
+     331
+    ],
+    [
+     226,
+     359
+    ],
+    [
+     188,
+     376
+    ],
+    [
+     131,
+     391
+    ],
+    [
+     87,
+     396
+    ],
+    [
+     24,
+     394
+    ],
+    [
+     24,
+     625
+    ]
+   ],
+   [
+    [
+     1856,
+     202
+    ],
+    [
+     1431,
+     453
+    ],
+    [
+     1604,
+     564
+    ],
+    [
+     1610,
+     530
+    ],
+    [
+     1625,
+     502
+    ],
+    [
+     1652,
+     473
+    ],
+    [
+     1678,
+     454
+    ],
+    [
+     1718,
+     434
+    ],
+    [
+     1767,
+     419
+    ],
+    [
+     1810,
+     412
+    ],
+    [
+     1856,
+     411
+    ]
+   ],
+   [
+    [
+     761,
+     24
+    ],
+    [
+     897,
+     111
+    ],
+    [
+     1044,
+     24
+    ]
+   ]
+  ]
+ },
+ "objects": [
+  {
+   "id": "pillar-w",
+   "kind": "pillar",
+   "status": "move-slightly",
+   "baseWorld": [
+    527.3,
+    588.6
+   ],
+   "basePx": [
+    513.8,
+    359.1
+   ],
+   "collisionRadiusWorld": 5,
+   "footprintPx": [
+    30.5,
+    19.4
+   ],
+   "currentBasePx": [
+    536.0,
+    418.0
+   ],
+   "maxHeightPx": 170,
+   "clearanceWorld": {
+    "toLaneEdge": 6.8,
+    "toRiverBank": 0.6,
+    "toNearestEntrance": 74.4
+   },
+   "meetsRules": true
+  },
+  {
+   "id": "pillar-n",
+   "kind": "pillar",
+   "status": "move-slightly",
+   "baseWorld": [
+    591.6,
+    528.5
+   ],
+   "basePx": [
+    906.1,
+    125.8
+   ],
+   "collisionRadiusWorld": 5,
+   "footprintPx": [
+    30.5,
+    19.4
+   ],
+   "currentBasePx": [
+    895.3,
+    196.1
+   ],
+   "maxHeightPx": 170,
+   "clearanceWorld": {
+    "toLaneEdge": 7.2,
+    "toRiverBank": 1.4,
+    "toNearestEntrance": 135.7
+   },
+   "meetsRules": true
+  },
+  {
+   "id": "pillar-e",
+   "kind": "pillar",
+   "status": "move-slightly",
+   "baseWorld": [
+    672.7,
+    611.4
+   ],
+   "basePx": [
+    1401.2,
+    447.5
+   ],
+   "collisionRadiusWorld": 5,
+   "footprintPx": [
+    30.5,
+    19.4
+   ],
+   "currentBasePx": [
+    1300.9,
+    478.2
+   ],
+   "maxHeightPx": 170,
+   "clearanceWorld": {
+    "toLaneEdge": 6.8,
+    "toRiverBank": 0.6,
+    "toNearestEntrance": 74.4
+   },
+   "meetsRules": true
+  },
+  {
+   "id": "pillar-s",
+   "kind": "pillar",
+   "status": "move-slightly",
+   "baseWorld": [
+    608.4,
+    671.5
+   ],
+   "basePx": [
+    1008.9,
+    680.8
+   ],
+   "collisionRadiusWorld": 5,
+   "footprintPx": [
+    30.5,
+    19.4
+   ],
+   "currentBasePx": [
+    897.1,
+    712.1
+   ],
+   "maxHeightPx": 170,
+   "clearanceWorld": {
+    "toLaneEdge": 7.2,
+    "toRiverBank": 1.4,
+    "toNearestEntrance": 135.7
+   },
+   "meetsRules": true
+  },
+  {
+   "id": "pillar-sw",
+   "kind": "pillar",
+   "status": "remove-from-1881",
+   "currentBasePx": [
+    132.2,
+    811.8
+   ],
+   "currentDistFromLaneCenterWorld": 14.7,
+   "reason": "落在兵线范围内（离中路中线 14.7，路沿在 46）",
+   "ifKeptIn2800": {
+    "baseWorld": [
+     435.3,
+     673.6
+    ],
+    "basePxIn2800": [
+     412.7,
+     1020.6
+    ],
+    "collisionRadiusWorld": 5
+   }
+  },
+  {
+   "id": "pillar-ne",
+   "kind": "pillar",
+   "status": "remove-from-1881",
+   "currentBasePx": [
+    1235.0,
+    82.1
+   ],
+   "currentDistFromLaneCenterWorld": 29.8,
+   "reason": "落在兵线范围内（离中路中线 29.8，路沿在 46）",
+   "ifKeptIn2800": {
+    "baseWorld": [
+     626.3,
+     496.5
+    ],
+    "basePxIn2800": [
+     1578.2,
+     333.9
+    ],
+    "collisionRadiusWorld": 5
+   }
+  },
+  {
+   "id": "rock-w1",
+   "kind": "rock",
+   "status": "keep",
+   "baseWorld": [
+    495.5,
+    557.9
+   ],
+   "basePx": [
+    320.0,
+    240.0
+   ],
+   "collisionRadiusWorld": 8.1,
+   "footprintPx": [
+    49.4,
+    31.4
+   ],
+   "clearanceWorld": {
+    "toLaneEdge": 47.8,
+    "toRiverBank": -1.6,
+    "toNearestEntrance": 33.4
+   },
+   "meetsRules": true
+  },
+  {
+   "id": "rock-w2",
+   "kind": "rock",
+   "status": "keep",
+   "baseWorld": [
+    504.7,
+    578
+   ],
+   "basePx": [
+    376.2,
+    317.9
+   ],
+   "collisionRadiusWorld": 7.5,
+   "footprintPx": [
+    45.8,
+    29.1
+   ],
+   "clearanceWorld": {
+    "toLaneEdge": 27.4,
+    "toRiverBank": 6.6,
+    "toNearestEntrance": 47.0
+   },
+   "meetsRules": true
+  },
+  {
+   "id": "rock-e",
+   "kind": "rock",
+   "status": "keep",
+   "baseWorld": [
+    692.5,
+    617.2
+   ],
+   "basePx": [
+    1521.7,
+    470.0
+   ],
+   "collisionRadiusWorld": 12.5,
+   "footprintPx": [
+    76.2,
+    48.5
+   ],
+   "clearanceWorld": {
+    "toLaneEdge": 17.0,
+    "toRiverBank": 3.0,
+    "toNearestEntrance": 46.5
+   },
+   "meetsRules": true
+  },
+  {
+   "id": "rock-s",
+   "kind": "rock",
+   "status": "keep",
+   "baseWorld": [
+    603.4,
+    705.3
+   ],
+   "basePx": [
+    978.2,
+    811.8
+   ],
+   "collisionRadiusWorld": 9.5,
+   "footprintPx": [
+    57.9,
+    36.9
+   ],
+   "clearanceWorld": {
+    "toLaneEdge": 24.1,
+    "toRiverBank": 24.3,
+    "toNearestEntrance": 117.7
+   },
+   "meetsRules": true
+  },
+  {
+   "id": "rock-ne",
+   "kind": "rock",
+   "status": "keep",
+   "baseWorld": [
+    746.3,
+    567.7
+   ],
+   "basePx": [
+    1849.9,
+    278.0
+   ],
+   "collisionRadiusWorld": 4.7,
+   "footprintPx": [
+    28.7,
+    18.2
+   ],
+   "clearanceWorld": {
+    "toLaneEdge": 25.0,
+    "toRiverBank": 83.9,
+    "toNearestEntrance": 69.6
+   },
+   "meetsRules": true
+  },
+  {
+   "id": "rock-se",
+   "kind": "rock",
+   "status": "shrink-and-move",
+   "baseWorld": [
+    740.2,
+    678.8
+   ],
+   "basePx": [
+    1812.7,
+    709.0
+   ],
+   "collisionRadiusWorld": 7,
+   "footprintPx": [
+    42.7,
+    27.2
+   ],
+   "currentBasePx": [
+    1790.1,
+    664.0
+   ],
+   "reason": "现在离东南野区入口只有 15.5 世界单位的净空；改后净空 30.3",
+   "clearanceWorld": {
+    "toLaneEdge": 100.1,
+    "toRiverBank": -1.0,
+    "toNearestEntrance": 30.3
+   },
+   "meetsRules": true
+  }
+ ],
+ "combatTowers": [
+  {
+   "id": "blue-mid-t1",
+   "world": [
+    573,
+    624
+   ],
+   "px": [
+    792.8,
+    496.4
+   ],
+   "collisionRadiusWorld": 13,
+   "footprintPx": [
+    79.3,
+    50.4
+   ]
+  },
+  {
+   "id": "red-mid-t1",
+   "world": [
+    680,
+    526
+   ],
+   "px": [
+    1445.5,
+    116.2
+   ],
+   "collisionRadiusWorld": 13,
+   "footprintPx": [
+    79.3,
+    50.4
+   ]
+  }
+ ],
+ "redraw": [
+  {
+   "n": 1,
+   "what": "两根穿模桥柱",
+   "items": [
+    {
+     "id": "pillar-sw",
+     "px": [
+      132.2,
+      811.8
+     ]
+    },
+    {
+     "id": "pillar-ne",
+     "px": [
+      1235.0,
+      82.1
+     ]
+    }
+   ],
+   "fix": "从 1881×836 画面里删掉并补全路面；外扩版若要保留，放到 objects 里 ifKeptIn2800 的位置"
+  },
+  {
+   "n": 2,
+   "what": "能走过去但画成齐膝墙的岸段",
+   "polylinesPx": {
+    "A": [
+     [
+      600,
+      0
+     ],
+     [
+      650,
+      25
+     ],
+     [
+      720,
+      60
+     ],
+     [
+      800,
+      115
+     ],
+     [
+      855,
+      165
+     ]
+    ],
+    "B": [
+     [
+      60,
+      95
+     ],
+     [
+      120,
+      110
+     ],
+     [
+      170,
+      130
+     ],
+     [
+      260,
+      190
+     ]
+    ],
+    "C": [
+     [
+      425,
+      300
+     ],
+     [
+      470,
+      325
+     ],
+     [
+      505,
+      345
+     ]
+    ],
+    "D": [
+     [
+      1335,
+      480
+     ],
+     [
+      1430,
+      520
+     ],
+     [
+      1560,
+      560
+     ],
+     [
+      1640,
+      600
+     ],
+     [
+      1700,
+      640
+     ]
+    ],
+    "E": [
+     [
+      925,
+      690
+     ],
+     [
+      1010,
+      725
+     ],
+     [
+      1100,
+      762
+     ],
+     [
+      1190,
+      800
+     ]
+    ],
+    "F": [
+     [
+      1730,
+      690
+     ],
+     [
+      1800,
+      720
+     ],
+     [
+      1881,
+      750
+     ]
+    ]
+   },
+   "fix": "改成贴地矮护岸（高度不超过 12px），并沿 riverBankSW / riverBankNE 两条模板线摆放；岸线内侧 40px 画浅滩"
+  },
+  {
+   "n": 3,
+   "what": "东南野区入口过窄",
+   "entrancePx": [
+    1848.1,
+    566.2
+   ],
+   "rockPx": [
+    1790.1,
+    664.0
+   ],
+   "fix": "rock-se 缩小到落地半宽 43px 并移到 objects 里的新底点；入口周围半径 183px（30 世界单位）不放任何立体物"
+  }
+ ],
+ "extended": {
+  "size": [
+   2800,
+   1500
+  ],
+  "offsetOfOriginalTopLeft": [
+   460,
+   332
+  ],
+  "anchorPx": [
+   1417.5,
+   735.3
+  ],
+  "formula": "u = 1417.5 + 6.1 * (X - 600);  v = 735.3 + 3.8796 * (Y - 600)",
+  "worldRect": [
+   367.6,
+   410.5,
+   826.6,
+   797.1
+  ],
+  "note": "原图左上角放在外扩画布的 (460, 332)。上一轮写的锚点 (1417, 735) 是四舍五入，准确值是 (1417.5, 735.3)。中路在外扩范围内有两处约 1.9° 的小折点，见 laneCenter。",
+  "laneCenterPx": [
+   [
+    106.1,
+    1500.0
+   ],
+   [
+    337.8,
+    1371.6
+   ],
+   [
+    1417.5,
+    735.3
+   ],
+   [
+    2497.2,
+    99.0
+   ],
+   [
+    2675.8,
+    0.0
+   ]
+  ],
+  "laneEdgeNWPx": [
+   [
+    0.0,
+    1322.1
+   ],
+   [
+    150.0,
+    1239.0
+   ],
+   [
+    1226.8,
+    604.4
+   ],
+   [
+    2252.5,
+    0.0
+   ]
+  ],
+  "laneEdgeSEPx": [
+   [
+    532.6,
+    1500.0
+   ],
+   [
+    1608.2,
+    866.2
+   ],
+   [
+    2685.0,
+    231.6
+   ],
+   [
+    2800.0,
+    167.9
+   ]
+  ],
+  "riverCenterPx": [
+   [
+    269.9,
+    0.0
+   ],
+   [
+    1417.5,
+    735.3
+   ],
+   [
+    2611.0,
+    1500.0
+   ]
+  ],
+  "riverBankSWPx": [
+   [
+    0.0,
+    36.0
+   ],
+   [
+    1253.0,
+    839.2
+   ],
+   [
+    2284.8,
+    1500.0
+   ]
+  ],
+  "riverBankNEPx": [
+   [
+    596.1,
+    0.0
+   ],
+   [
+    1582.0,
+    631.4
+   ],
+   [
+    2800.0,
+    1412.2
+   ]
+  ],
+  "entrances": [
+   {
+    "world": [
+     454,
+     558
+    ],
+    "px": [
+     526.9,
+     572.4
+    ]
+   },
+   {
+    "world": [
+     499,
+     778
+    ],
+    "px": [
+     801.4,
+     1425.9
+    ]
+   },
+   {
+    "world": [
+     746,
+     642
+    ],
+    "px": [
+     2308.1,
+     898.2
+    ]
+   },
+   {
+    "world": [
+     701,
+     422
+    ],
+    "px": [
+     2033.6,
+     44.7
+    ]
+   }
+  ],
+  "combatTowers": [
+   {
+    "id": "blue-mid-t1",
+    "world": [
+     573,
+     624
+    ],
+    "px": [
+     1252.8,
+     828.4
+    ],
+    "collisionRadiusWorld": 13,
+    "footprintPx": [
+     79.3,
+     50.4
+    ]
+   },
+   {
+    "id": "blue-mid-t2",
+    "world": [
+     458,
+     729
+    ],
+    "px": [
+     551.3,
+     1235.8
+    ],
+    "collisionRadiusWorld": 13,
+    "footprintPx": [
+     79.3,
+     50.4
+    ]
+   },
+   {
+    "id": "red-mid-t1",
+    "world": [
+     680,
+     526
+    ],
+    "px": [
+     1905.5,
+     448.2
+    ],
+    "collisionRadiusWorld": 13,
+    "footprintPx": [
+     79.3,
+     50.4
+    ]
+   },
+   {
+    "id": "red-mid-t2",
+    "world": [
+     797,
+     418
+    ],
+    "px": [
+     2619.2,
+     29.2
+    ],
+    "collisionRadiusWorld": 13,
+    "footprintPx": [
+     79.3,
+     50.4
+    ]
+   }
+  ],
+  "mapRocks": [
+   {
+    "world": [
+     353,
+     645
+    ],
+    "radiusWorld": 40,
+    "px": [
+     -89.2,
+     909.9
+    ],
+    "footprintPx": [
+     244.0,
+     155.2
+    ]
+   },
+   {
+    "world": [
+     433,
+     816
+    ],
+    "radiusWorld": 31,
+    "px": [
+     398.8,
+     1573.3
+    ],
+    "footprintPx": [
+     189.1,
+     120.3
+    ]
+   },
+   {
+    "world": [
+     335,
+     514
+    ],
+    "radiusWorld": 39,
+    "px": [
+     -199.0,
+     401.7
+    ],
+    "footprintPx": [
+     237.9,
+     151.3
+    ]
+   },
+   {
+    "world": [
+     365,
+     407
+    ],
+    "radiusWorld": 26,
+    "px": [
+     -16.0,
+     -13.5
+    ],
+    "footprintPx": [
+     158.6,
+     100.9
+    ]
+   },
+   {
+    "world": [
+     847,
+     555
+    ],
+    "radiusWorld": 40,
+    "px": [
+     2924.2,
+     560.7
+    ],
+    "footprintPx": [
+     244.0,
+     155.2
+    ]
+   },
+   {
+    "world": [
+     767,
+     384
+    ],
+    "radiusWorld": 31,
+    "px": [
+     2436.2,
+     -102.7
+    ],
+    "footprintPx": [
+     189.1,
+     120.3
+    ]
+   },
+   {
+    "world": [
+     865,
+     686
+    ],
+    "radiusWorld": 39,
+    "px": [
+     3034.0,
+     1068.9
+    ],
+    "footprintPx": [
+     237.9,
+     151.3
+    ]
+   },
+   {
+    "world": [
+     835,
+     793
+    ],
+    "radiusWorld": 26,
+    "px": [
+     2851.0,
+     1484.1
+    ],
+    "footprintPx": [
+     158.6,
+     100.9
+    ]
+   }
+  ],
+  "mapBrush": []
+ }
+}

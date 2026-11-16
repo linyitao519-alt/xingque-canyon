@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "mode": {
+    "humanTeam": "blue",
+    "humanHero": "xingli",
+    "blueBotLanes": ["north", "south"],
+    "redBotLanes": ["north", "mid", "south"],
+    "maxSeconds": 480,
+    "winCondition": "destroy-enemy-core",
+    "timeoutResult": "draw"
+  },
+  "wave": {
+    "firstSpawnSeconds": 4,
+    "intervalSeconds": 18,
+    "spacingSeconds": 0.55,
+    "units": ["melee", "melee", "ranged"],
+    "melee": {"hp": 130, "moveSpeed": 40, "attackRange": 21, "attackDamage": 12, "attackInterval": 1.1},
+    "ranged": {"hp": 85, "moveSpeed": 40, "attackRange": 72, "attackDamage": 15, "attackInterval": 1.35}
+  },
+  "tower": {"hp": 750, "attackRange": 116, "attackDamage": 60, "attackInterval": 1.05, "collisionRadius": 13},
+  "core": {"hp": 1300, "collisionRadius": 24},
+  "heroDefaults": {
+    "hp": 420,
+    "moveSpeed": 84,
+    "collisionRadius": 10,
+    "respawnSeconds": 8,
+    "basicAttack": {"range": 98, "damage": 35, "interval": 0.8}
+  },
+  "bots": {
+    "retreatBelowHpFraction": 0.28,
+    "rejoinAboveHpFraction": 0.85,
+    "baseHealingHpPerSecond": 100,
+    "baseHealRadius": 56,
+    "chaseMaxDistance": 100,
+    "avoidEnemyTowerUnlessAlliedMinionInRange": true
+  },
+  "xingli": {
+    "skills": [
+      {"id": "crescent", "name": "弦月", "kind": "line", "range": 155, "width": 24, "damage": 70, "cooldownSeconds": 4},
+      {"id": "beacon", "name": "定星", "kind": "ground-circle", "castRange": 140, "radius": 40, "damage": 45, "slowFraction": 0.3, "slowSeconds": 1.3, "markLifetimeSeconds": 7, "maxActiveMarks": 2, "cooldownSeconds": 3},
+      {"id": "constellation", "name": "三星结界", "kind": "triangle", "castRange": 140, "requiresActiveMarks": 2, "minimumTriangleArea": 180, "damage": 115, "rootSeconds": 0.85, "cooldownSeconds": 22}
+    ]
+  },
+  "jungle": {
+    "smallCamp": {"hp": 240, "respawnSeconds": 38, "healOnKill": 45},
+    "starDragon": {"hp": 900, "firstSpawnSeconds": 65, "respawnSeconds": 95, "buffSeconds": 28, "teamMinionDamageMultiplier": 1.2},
+    "crystalTortoise": {"hp": 800, "firstSpawnSeconds": 65, "respawnSeconds": 95, "buffSeconds": 28, "teamHeroShieldHp": 65}
+  }
+}

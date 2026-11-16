@@ -1,0 +1,635 @@
+{
+  "version": 1,
+  "world": {
+    "width": 1200,
+    "height": 1200,
+    "origin": "top-left",
+    "xPositive": "right",
+    "yPositive": "down",
+    "playableBounds": [
+      75,
+      105,
+      1125,
+      1095
+    ]
+  },
+  "teams": {
+    "blue": {
+      "core": [
+        145,
+        1010
+      ],
+      "heroSpawn": [
+        150,
+        1043
+      ]
+    },
+    "red": {
+      "core": [
+        1055,
+        190
+      ],
+      "heroSpawn": [
+        1050,
+        157
+      ]
+    }
+  },
+  "lanes": {
+    "north": {
+      "blueToRed": [
+        [
+          145,
+          1010
+        ],
+        [
+          124,
+          938
+        ],
+        [
+          118,
+          780
+        ],
+        [
+          118,
+          578
+        ],
+        [
+          118,
+          350
+        ],
+        [
+          125,
+          244
+        ],
+        [
+          163,
+          179
+        ],
+        [
+          240,
+          150
+        ],
+        [
+          485,
+          145
+        ],
+        [
+          700,
+          145
+        ],
+        [
+          924,
+          145
+        ],
+        [
+          1055,
+          190
+        ]
+      ],
+      "nominalWidth": 72,
+      "towers": {
+        "blue": [
+          {
+            "id": "blue-north-t1",
+            "position": [
+              118,
+              645
+            ]
+          },
+          {
+            "id": "blue-north-t2",
+            "position": [
+              118,
+              460
+            ]
+          },
+          {
+            "id": "blue-north-t3",
+            "position": [
+              125,
+              278
+            ]
+          }
+        ],
+        "red": [
+          {
+            "id": "red-north-t1",
+            "position": [
+              355,
+              150
+            ]
+          },
+          {
+            "id": "red-north-t2",
+            "position": [
+              561,
+              145
+            ]
+          },
+          {
+            "id": "red-north-t3",
+            "position": [
+              766,
+              145
+            ]
+          }
+        ]
+      }
+    },
+    "mid": {
+      "blueToRed": [
+        [
+          145,
+          1010
+        ],
+        [
+          267,
+          900
+        ],
+        [
+          423,
+          764
+        ],
+        [
+          600,
+          600
+        ],
+        [
+          777,
+          436
+        ],
+        [
+          933,
+          300
+        ],
+        [
+          1055,
+          190
+        ]
+      ],
+      "nominalWidth": 92,
+      "towers": {
+        "blue": [
+          {
+            "id": "blue-mid-t1",
+            "position": [
+              506,
+              687
+            ]
+          },
+          {
+            "id": "blue-mid-t2",
+            "position": [
+              403,
+              782
+            ]
+          },
+          {
+            "id": "blue-mid-t3",
+            "position": [
+              284,
+              885
+            ]
+          }
+        ],
+        "red": [
+          {
+            "id": "red-mid-t1",
+            "position": [
+              694,
+              513
+            ]
+          },
+          {
+            "id": "red-mid-t2",
+            "position": [
+              797,
+              418
+            ]
+          },
+          {
+            "id": "red-mid-t3",
+            "position": [
+              916,
+              315
+            ]
+          }
+        ]
+      }
+    },
+    "south": {
+      "blueToRed": [
+        [
+          145,
+          1010
+        ],
+        [
+          276,
+          1055
+        ],
+        [
+          500,
+          1055
+        ],
+        [
+          715,
+          1055
+        ],
+        [
+          960,
+          1050
+        ],
+        [
+          1037,
+          1021
+        ],
+        [
+          1075,
+          956
+        ],
+        [
+          1082,
+          850
+        ],
+        [
+          1082,
+          622
+        ],
+        [
+          1082,
+          420
+        ],
+        [
+          1076,
+          262
+        ],
+        [
+          1055,
+          190
+        ]
+      ],
+      "nominalWidth": 72,
+      "towers": {
+        "blue": [
+          {
+            "id": "blue-south-t1",
+            "position": [
+              845,
+              1050
+            ]
+          },
+          {
+            "id": "blue-south-t2",
+            "position": [
+              639,
+              1055
+            ]
+          },
+          {
+            "id": "blue-south-t3",
+            "position": [
+              434,
+              1055
+            ]
+          }
+        ],
+        "red": [
+          {
+            "id": "red-south-t1",
+            "position": [
+              1082,
+              555
+            ]
+          },
+          {
+            "id": "red-south-t2",
+            "position": [
+              1082,
+              740
+            ]
+          },
+          {
+            "id": "red-south-t3",
+            "position": [
+              1075,
+              922
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "river": {
+    "centerline": [
+      [
+        199,
+        139
+      ],
+      [
+        331,
+        329
+      ],
+      [
+        600,
+        600
+      ],
+      [
+        869,
+        871
+      ],
+      [
+        1001,
+        1061
+      ]
+    ],
+    "nominalWidth": 76,
+    "blocksMovement": false
+  },
+  "neutralObjectives": [
+    {
+      "id": "star-dragon",
+      "center": [
+        440,
+        420
+      ],
+      "radius": 75
+    },
+    {
+      "id": "crystal-tortoise",
+      "center": [
+        760,
+        780
+      ],
+      "radius": 75
+    }
+  ],
+  "jungleCamps": [
+    {
+      "id": "blue-wolves",
+      "center": [
+        246,
+        711
+      ],
+      "radius": 27
+    },
+    {
+      "id": "blue-golem",
+      "center": [
+        459,
+        910
+      ],
+      "radius": 27
+    },
+    {
+      "id": "blue-boars",
+      "center": [
+        273,
+        476
+      ],
+      "radius": 27
+    },
+    {
+      "id": "blue-wisp",
+      "center": [
+        407,
+        253
+      ],
+      "radius": 27
+    },
+    {
+      "id": "red-wolves",
+      "center": [
+        954,
+        489
+      ],
+      "radius": 27
+    },
+    {
+      "id": "red-golem",
+      "center": [
+        741,
+        290
+      ],
+      "radius": 27
+    },
+    {
+      "id": "red-boars",
+      "center": [
+        927,
+        724
+      ],
+      "radius": 27
+    },
+    {
+      "id": "red-wisp",
+      "center": [
+        793,
+        947
+      ],
+      "radius": 27
+    }
+  ],
+  "jungleEntrances": [
+    [
+      244,
+      272
+    ],
+    [
+      274,
+      768
+    ],
+    [
+      454,
+      558
+    ],
+    [
+      499,
+      778
+    ],
+    [
+      746,
+      642
+    ],
+    [
+      701,
+      422
+    ],
+    [
+      926,
+      432
+    ],
+    [
+      956,
+      928
+    ]
+  ],
+  "brush": [
+    {
+      "center": [
+        206,
+        732
+      ],
+      "radius": 23
+    },
+    {
+      "center": [
+        268,
+        591
+      ],
+      "radius": 23
+    },
+    {
+      "center": [
+        338,
+        504
+      ],
+      "radius": 23
+    },
+    {
+      "center": [
+        462,
+        849
+      ],
+      "radius": 23
+    },
+    {
+      "center": [
+        528,
+        915
+      ],
+      "radius": 23
+    },
+    {
+      "center": [
+        335,
+        325
+      ],
+      "radius": 23
+    },
+    {
+      "center": [
+        994,
+        468
+      ],
+      "radius": 23
+    },
+    {
+      "center": [
+        932,
+        609
+      ],
+      "radius": 23
+    },
+    {
+      "center": [
+        862,
+        696
+      ],
+      "radius": 23
+    },
+    {
+      "center": [
+        738,
+        351
+      ],
+      "radius": 23
+    },
+    {
+      "center": [
+        672,
+        285
+      ],
+      "radius": 23
+    },
+    {
+      "center": [
+        865,
+        875
+      ],
+      "radius": 23
+    }
+  ],
+  "staticObstacles": [
+    {
+      "kind": "rock",
+      "center": [
+        235,
+        768
+      ],
+      "radius": 42
+    },
+    {
+      "kind": "rock",
+      "center": [
+        353,
+        645
+      ],
+      "radius": 40
+    },
+    {
+      "kind": "rock",
+      "center": [
+        335,
+        514
+      ],
+      "radius": 39
+    },
+    {
+      "kind": "rock",
+      "center": [
+        365,
+        407
+      ],
+      "radius": 26
+    },
+    {
+      "kind": "rock",
+      "center": [
+        345,
+        273
+      ],
+      "radius": 34
+    },
+    {
+      "kind": "rock",
+      "center": [
+        965,
+        432
+      ],
+      "radius": 42
+    },
+    {
+      "kind": "rock",
+      "center": [
+        847,
+        555
+      ],
+      "radius": 40
+    },
+    {
+      "kind": "rock",
+      "center": [
+        865,
+        686
+      ],
+      "radius": 39
+    },
+    {
+      "kind": "rock",
+      "center": [
+        835,
+        793
+      ],
+      "radius": 26
+    },
+    {
+      "kind": "rock",
+      "center": [
+        855,
+        927
+      ],
+      "radius": 34
+    }
+  ]
+}

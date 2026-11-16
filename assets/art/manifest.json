@@ -1,0 +1,184 @@
+{
+ "heroes": {
+  "xingli": {
+   "file": "hero-xingli",
+   "h": 37.0,
+   "ax": 0.4069,
+   "ay": 1.0,
+   "name": "星璃"
+  },
+  "xuanyuan": {
+   "file": "hero-xuanyuan",
+   "h": 45.14,
+   "ax": 0.2215,
+   "ay": 1.0,
+   "name": "玄垣"
+  },
+  "hedeng": {
+   "file": "hero-hedeng",
+   "h": 42.18,
+   "ax": 0.3701,
+   "ay": 1.0,
+   "name": "鹤灯"
+  },
+  "yelan": {
+   "file": "hero-yelan",
+   "h": 41.44,
+   "ax": 0.3384,
+   "ay": 1.0,
+   "name": "夜岚"
+  },
+  "feixian": {
+   "file": "hero-feixian",
+   "h": 41.44,
+   "ax": 0.2276,
+   "ay": 1.0,
+   "name": "绯弦"
+  },
+  "chiyan": {
+   "file": "hero-chiyan",
+   "h": 43.66,
+   "ax": 0.3849,
+   "ay": 1.0,
+   "name": "赤檐"
+  }
+ },
+ "minions": {
+  "melee-blue": {
+   "file": "melee-blue",
+   "h": 20.0,
+   "ax": 0.1893,
+   "ay": 1.0
+  },
+  "melee-red": {
+   "file": "melee-red",
+   "h": 20.0,
+   "ax": 0.2507,
+   "ay": 1.0
+  },
+  "ranged-blue": {
+   "file": "ranged-blue",
+   "h": 19.0,
+   "ax": 0.306,
+   "ay": 1.0
+  },
+  "ranged-red": {
+   "file": "ranged-red",
+   "h": 19.0,
+   "ax": 0.2863,
+   "ay": 1.0
+  }
+ },
+ "structures": {
+  "tower-blue-intact": {
+   "file": "tower-blue-intact",
+   "h": 57.34,
+   "ax": 0.4938,
+   "ay": 0.834
+  },
+  "tower-blue-destroyed": {
+   "file": "tower-blue-destroyed",
+   "h": 30.13,
+   "ax": 0.4969,
+   "ay": 0.684
+  },
+  "tower-red-intact": {
+   "file": "tower-red-intact",
+   "h": 57.34,
+   "ax": 0.4953,
+   "ay": 0.8359
+  },
+  "tower-red-destroyed": {
+   "file": "tower-red-destroyed",
+   "h": 33.15,
+   "ax": 0.5,
+   "ay": 0.7162
+  },
+  "core-blue-intact": {
+   "file": "core-blue-intact",
+   "h": 92.16,
+   "ax": 0.5461,
+   "ay": 0.7891
+  },
+  "core-blue-destroyed": {
+   "file": "core-blue-destroyed",
+   "h": 90.72,
+   "ax": 0.4805,
+   "ay": 0.7857
+  },
+  "core-red-intact": {
+   "file": "core-red-intact",
+   "h": 92.16,
+   "ax": 0.5379,
+   "ay": 0.7891
+  },
+  "core-red-destroyed": {
+   "file": "core-red-destroyed",
+   "h": 89.82,
+   "ax": 0.5616,
+   "ay": 0.7836
+  }
+ },
+ "rocks": [
+  {
+   "file": "rock-flat",
+   "ax": 0.5015,
+   "ay": 1.0,
+   "aspect": 1.3086
+  },
+  {
+   "file": "rock-moss",
+   "ax": 0.4831,
+   "ay": 1.0,
+   "aspect": 1.0957
+  },
+  {
+   "file": "rock-tall",
+   "ax": 0.4908,
+   "ay": 1.0,
+   "aspect": 0.6367
+  }
+ ],
+ "brush": [
+  {
+   "file": "brush-short",
+   "ax": 0.4812,
+   "ay": 1.0,
+   "aspect": 1.4024
+  },
+  {
+   "file": "brush-tall",
+   "ax": 0.5176,
+   "ay": 1.0,
+   "aspect": 1.2227
+  }
+ ],
+ "trees": [
+  {
+   "file": "tree-broadleaf",
+   "ax": 0.4518,
+   "ay": 1.0,
+   "aspect": 1.1758
+  },
+  {
+   "file": "tree-pine",
+   "ax": 0.3773,
+   "ay": 1.0,
+   "aspect": 1.286
+  }
+ ],
+ "tiles": {
+  "grass": {
+   "file": "grass",
+   "span": 120
+  },
+  "stone": {
+   "file": "stone",
+   "span": 100
+  },
+  "water": {
+   "file": "water",
+   "span": 110
+  }
+ }
+}

@@ -1,0 +1,142 @@
+{
+ "note": "帧带横排；每帧锚点在 (ax, ay) 比例处；h 是整帧高度对应的世界单位。states 里 fps/loop 可调；attack 的 release 是出手帧的序号（从 0 起）。",
+ "states": {
+  "idle": {
+   "frames": 4,
+   "fps": 5,
+   "loop": true
+  },
+  "run": {
+   "frames": 6,
+   "fps": 13,
+   "loop": true
+  },
+  "attack": {
+   "frames": 4,
+   "fps": 11,
+   "loop": false,
+   "release": 2
+  }
+ },
+ "blend": 0.45,
+ "units": {
+  "chiyan": {
+   "file": "hero-chiyan",
+   "frameW": 384,
+   "frameH": 256,
+   "h": 51.31,
+   "ax": 0.5,
+   "ay": 1.0
+  },
+  "feixian": {
+   "file": "hero-feixian",
+   "frameW": 384,
+   "frameH": 256,
+   "h": 46.4,
+   "ax": 0.5,
+   "ay": 1.0
+  },
+  "hedeng": {
+   "file": "hero-hedeng",
+   "frameW": 384,
+   "frameH": 256,
+   "h": 49.23,
+   "ax": 0.5,
+   "ay": 1.0
+  },
+  "xingli": {
+   "file": "hero-xingli",
+   "frameW": 384,
+   "frameH": 256,
+   "h": 39.69,
+   "ax": 0.5,
+   "ay": 1.0,
+   "attach": {
+    "file": "hero-xingli-astrolabe.png",
+    "w": 7.88,
+    "h": 10.04,
+    "cx": 0.532,
+    "cy": 0.46,
+    "mount": {
+     "idle": [
+      11.57,
+      26.06
+     ],
+     "run": [
+      11.63,
+      25.88
+     ],
+     "attack": [
+      [
+       11.78,
+       26.43
+      ],
+      [
+       11.86,
+       25.97
+      ],
+      [
+       12.48,
+       30.62
+      ],
+      [
+       11.63,
+       26.05
+      ]
+     ]
+    },
+    "bob": 0.5,
+    "follow": 10,
+    "note": "独立星盘。mount = 星盘中心相对脚底锚点的位置（世界单位：x 朝面向方向为正，y 向上）；待机/跑步各一个固定挂点，普攻逐帧（第 2 帧抬手）。follow 是跟随的收敛速率（1/秒），bob 是上下浮动幅度。"
+   }
+  },
+  "xuanyuan": {
+   "file": "hero-xuanyuan",
+   "frameW": 384,
+   "frameH": 256,
+   "h": 52.65,
+   "ax": 0.5,
+   "ay": 1.0
+  },
+  "yelan": {
+   "file": "hero-yelan",
+   "frameW": 384,
+   "frameH": 256,
+   "h": 48.41,
+   "ax": 0.5,
+   "ay": 1.0
+  },
+  "melee-blue": {
+   "file": "melee-blue",
+   "frameW": 192,
+   "frameH": 128,
+   "h": 22.76,
+   "ax": 0.5,
+   "ay": 1.0
+  },
+  "melee-red": {
+   "file": "melee-red",
+   "frameW": 192,
+   "frameH": 128,
+   "h": 24.13,
+   "ax": 0.5,
+   "ay": 1.0
+  },
+  "ranged-blue": {
+   "file": "ranged-blue",
+   "frameW": 192,
+   "frameH": 128,
+   "h": 22.04,
+   "ax": 0.5,
+   "ay": 1.0
+  },
+  "ranged-red": {
+   "file": "ranged-red",
+   "frameW": 192,
+   "frameH": 128,
+   "h": 21.82,
+   "ax": 0.5,
+   "ay": 1.0
+  }
+ }
+}
