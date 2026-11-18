@@ -8,8 +8,6 @@ A single-player 3-lane mobile MOBA prototype that runs in the browser. Code writ
 
 ![screenshot](docs/screenshot.png)
 
-演示视频：[docs/demo.mp4](docs/demo.mp4)
-
 玩法演示（28 秒）：[docs/skills-mix.mp4](docs/skills-mix.mp4)
 
 ## 现在有什么
